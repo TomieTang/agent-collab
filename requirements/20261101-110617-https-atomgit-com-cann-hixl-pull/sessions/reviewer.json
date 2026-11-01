@@ -1,0 +1,22 @@
+{
+  "role": "reviewer",
+  "label": "glm-5.3",
+  "model": "cannbot/glm-5.3",
+  "sessionID": "mock-ses-5-reviewerhttp",
+  "exportedAt": "2026-11-01T03:06:39.707Z",
+  "messages": [
+    {
+      "info": {
+        "id": "mock-msg-mock-ses-5-reviewerhttp-1",
+        "role": "assistant",
+        "sessionID": "mock-ses-5-reviewerhttp"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "MOCK 会话原始记录"
+        }
+      ]
+    }
+  ]
+}

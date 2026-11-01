@@ -1,0 +1,22 @@
+{
+  "role": "architect",
+  "label": "deepseek-v4-pro",
+  "model": "cannbot/deepseek-v4-pro",
+  "sessionID": "mock-ses-4-architecthtt",
+  "exportedAt": "2026-11-01T03:06:39.703Z",
+  "messages": [
+    {
+      "info": {
+        "id": "mock-msg-mock-ses-4-architecthtt-1",
+        "role": "assistant",
+        "sessionID": "mock-ses-4-architecthtt"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "MOCK 会话原始记录"
+        }
+      ]
+    }
+  ]
+}

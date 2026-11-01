@@ -196,6 +196,14 @@ workspace-template/  opencode agent 定义模板
 requirements/        需求归档
 ```
 
+## 关于 GitHub Pages
+
+GitHub Pages 只能托管静态文件，无法运行本服务（需要子进程 + 本地仓库写入 + opencode）。所以常见做法是：
+
+- 代码与归档放仓库（`requirements/` 直接 commit，形成可追溯的需求史）
+- 服务在本地或自己的机器上跑，对外用 Cloudflare Tunnel / Tailscale 暴露 3000
+- CI 用 GitHub Actions 跑 `npm test`（MOCK 模式，无需任何密钥）
+
 ## 已知限制
 
 - 单人使用，单密码鉴权，无多租户。

@@ -1,0 +1,22 @@
+{
+  "role": "verifier",
+  "label": "deepseek-v4.1-flash",
+  "model": "cannbot/deepseek-v4.1-flash",
+  "sessionID": "mock-ses-6-verifierhttp",
+  "exportedAt": "2026-11-01T03:06:39.709Z",
+  "messages": [
+    {
+      "info": {
+        "id": "mock-msg-mock-ses-6-verifierhttp-1",
+        "role": "assistant",
+        "sessionID": "mock-ses-6-verifierhttp"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "MOCK 会话原始记录"
+        }
+      ]
+    }
+  ]
+}

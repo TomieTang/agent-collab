@@ -9,7 +9,7 @@
   "control": "run",
   "mock": true,
   "createdAt": "2026-11-01T02:57:27.917Z",
-  "updatedAt": "2026-11-01T02:58:32.235Z",
+  "updatedAt": "2026-11-01T03:06:46.708Z",
   "roles": {
     "architect": {
       "label": "说明",
@@ -42,7 +42,10 @@
     "round-2/review-reviewer.md",
     "round-2/verify-verifier.md",
     "DECISION.md",
-    "REPORT.md"
+    "REPORT.md",
+    "sessions/architect.json",
+    "sessions/reviewer.json",
+    "sessions/verifier.json"
   ],
   "messages": [
     {
@@ -239,5 +242,9 @@
     }
   ],
   "reason": "评审与核验通过",
-  "finishedAt": "2026-11-01T02:58:32.216Z"
+  "finishedAt": "2026-11-01T02:58:32.216Z",
+  "interaction": "pipeline",
+  "closed": true,
+  "closedAt": "2026-11-01T03:06:46.708Z",
+  "closeErrors": []
 }

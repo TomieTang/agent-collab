@@ -88,6 +88,10 @@ class Local {
     return this.api(`/api/rooms/${encodeURIComponent(id)}/stop`, { method: 'POST' })
   }
 
+  close(id) {
+    return this.api(`/api/rooms/${encodeURIComponent(id)}/close`, { method: 'POST' })
+  }
+
   say(id, text) {
     return this.api(`/api/rooms/${encodeURIComponent(id)}/say`, { method: 'POST', body: { text } })
   }
@@ -159,6 +163,52 @@ async function stopAndWait(roomId, timeoutMs = 90000) {
   return null
 }
 
+function isEndSignal(disc) {
+  if (!disc) return false
+  if (Number(disc.is_closed) === 1) return true
+  const title = String(disc.title || '')
+  if (/\[(end|结束)\]/i.test(title)) return true
+  const category = String(disc.category?.name || '').trim().toLowerCase()
+  if (cfg.endCategory && category === cfg.endCategory.toLowerCase()) return true
+  return false
+}
+
+function isEndComment(text) {
+  return /^\s*\/?(end|结束|stop)\s*$/i.test(String(text || ''))
+}
+
+async function endDiscussion(number, entry, reason) {
+  if (entry.ended) return
+  entry.ended = true
+  console.log(`#${number} 结束信号：${reason}`)
+  let room = null
+  if (entry.roomId) {
+    room = await stopAndWait(entry.roomId)
+    entry.finished = true
+    entry.finishedAt = entry.finishedAt || new Date().toISOString()
+    await saveState()
+  }
+  await archiveRoom(number, entry)
+  if (entry.roomId && cfg.closeOnEnd) {
+    try {
+      const res = await local.close(entry.roomId)
+      entry.closed = true
+      entry.closedAt = new Date().toISOString()
+      entry.closeErrors = res?.errors || []
+      await saveState()
+      console.log(`#${number} 会话已关闭${res?.errors?.length ? `（异常 ${res.errors.length}）` : ''}`)
+    } catch (e) {
+      console.error(`#${number} 关闭会话失败：${e.message}`)
+    }
+  }
+  await post(
+    number,
+    `${BOT_MARK}\n**讨论已结束**（${reason}）\n\n产出已归档并提交；${cfg.closeOnEnd ? '对应会话已关闭。' : '会话保留。'}\n\n${room ? `状态：${room.status} — ${room.reason || ''}` : ''}`
+  )
+  entry.finished = true
+  await saveState()
+}
+
 async function archiveRoom(number, entry) {
   if (entry.archived || !entry.roomId) return
   const room = await local.room(entry.roomId).catch(() => null)
@@ -185,8 +235,14 @@ async function handleDiscussion(number) {
     archived: false,
   }
   state[key] = entry
+  const disc = await hub.getDiscussion(number)
+  if (entry.ended) return
+  if (isEndSignal(disc)) {
+    await endDiscussion(number, entry, Number(disc.is_closed) === 1 ? '讨论已关闭' : '标题/分类标记为 end')
+    return
+  }
+
   if (!entry.roomId) {
-    const disc = await hub.getDiscussion(number)
     const task = `${disc.title}\n\n${disc.md_content || ''}`.trim()
     const room = await local.createRoom(task)
     entry.roomId = room.id
@@ -221,6 +277,10 @@ async function handleDiscussion(number) {
   if (lastHuman && lastHuman.id !== entry.lastHumanId) {
     entry.lastHumanId = lastHuman.id
     const text = lastHuman.md_content || ''
+    if (isEndComment(text)) {
+      await endDiscussion(number, entry, '评论区 /end')
+      return
+    }
     if (text.trim()) {
       await local.say(entry.roomId, text)
       entry.questionPosted = false

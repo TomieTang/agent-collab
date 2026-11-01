@@ -100,7 +100,8 @@ try {
   discussions.push(
     { number: 1, title: 'TASK-ONE 讨论接口设计', md_content: '实现 A', author: { login: 'tangjie66' }, created_at: now, is_closed: 0 },
     { number: 2, title: 'TASK-TWO 讨论错误处理', md_content: '实现 B', author: { login: 'tangjie66' }, created_at: now, is_closed: 0 },
-    { number: 3, title: 'TASK-THREE 保持等待', md_content: '实现 C', author: { login: 'tangjie66' }, created_at: now, is_closed: 0 }
+    { number: 3, title: 'TASK-THREE 保持等待', md_content: '实现 C', author: { login: 'tangjie66' }, created_at: now, is_closed: 0 },
+    { number: 4, title: 'TASK-FOUR 手动结束', md_content: '实现 D', author: { login: 'tangjie66' }, created_at: now, is_closed: 0 }
   )
 
   const asked = (n) => (comments[n] || []).some((c) => String(c.md_content).includes('需要你确认'))
@@ -146,6 +147,27 @@ try {
   assert.ok(comments[1]?.length > 0, 'discussion #1 should receive comments')
   assert.ok(comments[2]?.length > 0, 'discussion #2 should receive comments')
   assert.ok(!JSON.stringify(comments[1]).includes('TASK-TWO'), 'no cross-talk into #1')
+
+  const asked4 = () => (comments[4] || []).some((c) => String(c.md_content).includes('需要你确认'))
+  for (let i = 0; i < 40; i++) {
+    await sleep(500)
+    if (asked4()) break
+  }
+  assert.ok(asked4(), 'discussion #4 should reach the asking state')
+  ;(comments[4] ||= []).push({ id: 'human-end-4', md_content: '/end', created_at: new Date().toISOString() })
+
+  for (let i = 0; i < 40; i++) {
+    await sleep(500)
+    const cur = JSON.parse(await fs.readFile(stateFile, 'utf8').catch(() => '{}'))
+    if (cur['o/r#4']?.closed) break
+  }
+  const stEnd = JSON.parse(await fs.readFile(stateFile, 'utf8'))
+  assert.equal(stEnd['o/r#4'].ended, true, '#4 should end on /end')
+  assert.equal(stEnd['o/r#4'].closed, true, '#4 sessions should be closed')
+  assert.equal(stEnd['o/r#4'].archived, true, '#4 should be archived before closing')
+  const room4 = await getRoom(stEnd['o/r#4'].roomId)
+  assert.equal(room4.room.closed, true, 'room #4 should be marked closed')
+  assert.ok((await fs.stat(path.join(env.COLLAB_ARCHIVE, stEnd['o/r#4'].roomId, 'sessions', 'architect.json')).catch(() => null)), 'closed room must export raw sessions')
 
   const before = Object.keys(st).filter((k) => k !== '__meta').length
   conn.kill('SIGTERM')

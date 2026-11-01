@@ -276,3 +276,18 @@ npm start
 | `CONNECTOR_GIT` | `0` 关闭自动提交 |
 | `CONNECTOR_REMOTE` / `CONNECTOR_BRANCH` | 默认 `origin` / `main` |
 | `CONNECTOR_STATE` | 默认 `~/.config/agent-collab/connector.json` |
+| `CONNECTOR_CLOSE` | `0` 时结束后保留会话；默认关闭会话 |
+| `HUB_END_CATEGORY` | 视为「结束」的讨论分类名，默认 `end` |
+
+### 结束一个讨论
+
+以下任一信号出现时，connector 会：停止房间 → 等归档落盘 → 提交 git → 导出原始会话到 `sessions/` → 删除 session → 回帖说明。
+
+| 信号 | 操作 | 可被 API 读取 |
+| --- | --- | --- |
+| 关闭讨论（`is_closed=1`） | 页面上点「关闭」 | ✅ 最省事 |
+| 标题包含 `[end]` 或 `[结束]` | 改标题 | ✅ |
+| 分类改为 `end` | 改分类 | ✅ |
+| 评论区发 `/end`、`/结束`、`/stop` | 发一条评论 | ✅ |
+
+> AtomGit / GitCode 的讨论 **label 不开放读取**（`/discuss/{n}` 与列表都不返回 labels，v1 label 接口需要网页会话），所以无法直接按 label 判断，改用上面四种等价的信号。

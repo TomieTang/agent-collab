@@ -74,6 +74,8 @@ export const config = {
     stateFile: env.CONNECTOR_STATE || path.join(os.homedir(), '.config/agent-collab/connector.json'),
     includeExisting: env.HUB_INCLUDE_EXISTING === '1',
     git: env.CONNECTOR_GIT !== '0',
+    closeOnEnd: env.CONNECTOR_CLOSE !== '0',
+    endCategory: env.HUB_END_CATEGORY || 'end',
     remote: env.CONNECTOR_REMOTE || 'origin',
     branch: env.CONNECTOR_BRANCH || 'main',
   },

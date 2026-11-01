@@ -1,0 +1,40 @@
+{
+  "id": "20261101-110207-冒烟-错误处理用错误码还是异常",
+  "task": "冒烟：错误处理用错误码还是异常",
+  "mode": "build",
+  "interaction": "chat",
+  "doneWhen": [],
+  "maxRounds": 1,
+  "round": 0,
+  "status": "created",
+  "control": "run",
+  "mock": true,
+  "createdAt": "2026-11-01T03:02:07.334Z",
+  "updatedAt": "2026-11-01T03:02:07.337Z",
+  "roles": {
+    "architect": {
+      "label": "deepseek-v4-pro",
+      "model": "cannbot/deepseek-v4-pro",
+      "agent": "architect",
+      "sessionID": "mock-ses-1-architect"
+    },
+    "reviewer": {
+      "label": "glm-5.3",
+      "model": "cannbot/glm-5.3",
+      "agent": "reviewer",
+      "sessionID": "mock-ses-2-reviewer"
+    },
+    "verifier": {
+      "label": "deepseek-v4.1-flash",
+      "model": "cannbot/deepseek-v4.1-flash",
+      "agent": "verifier",
+      "sessionID": "mock-ses-3-verifier"
+    }
+  },
+  "workspace": "/home/tangjie/agent-collab/workspace",
+  "isolated": false,
+  "isolationReason": "workspace 不是 git 仓库，无法建立独立 worktree",
+  "worktreeBranch": "",
+  "artifacts": [],
+  "messages": []
+}

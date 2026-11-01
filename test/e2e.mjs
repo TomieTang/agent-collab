@@ -210,17 +210,36 @@ try {
   for (let i = 0; i < 100; i++) {
     await sleep(300)
     const { room: r } = await api(`/api/rooms/${encodeURIComponent(chat.id)}`)
+    if (r.status === 'waiting_input') {
+      c = r
+      break
+    }
+  }
+  assert.equal(c?.status, 'waiting_input', `chat should pause to ask human, got ${c?.status}`)
+  assert.ok(c.pendingQuestion?.question, 'should carry a pending question')
+
+  await api(`/api/rooms/${encodeURIComponent(chat.id)}/say`, {
+    method: 'POST',
+    body: JSON.stringify({ text: '每秒 100 条，P99 要求 50ms 以内' }),
+  })
+
+  for (let i = 0; i < 100; i++) {
+    await sleep(300)
+    const { room: r } = await api(`/api/rooms/${encodeURIComponent(chat.id)}`)
     if (['done', 'needs_human', 'error', 'stopped'].includes(r.status)) {
       c = r
       break
     }
   }
   assert.equal(c?.status, 'done', `chat room: ${c?.status} ${c?.reason}`)
-  assert.equal(c.messages.length, 3, 'chat should alternate three speakers once')
+  assert.equal(c.messages.filter((m) => m.kind === 'chat').length, 3, 'three model turns')
+  assert.equal(c.messages.filter((m) => m.kind === 'human').length, 1, 'one human answer')
+  assert.equal(c.pendingQuestion, null)
   const chatTranscript = await fs.readFile(path.join(env.COLLAB_ARCHIVE, chat.id, 'transcript.md'), 'utf8')
   assert.equal((chatTranscript.match(/· chat/g) || []).length, 3)
   const chatDecision = await fs.readFile(path.join(env.COLLAB_ARCHIVE, chat.id, 'DECISION.md'), 'utf8')
   assert.match(chatDecision, /模式：chat/)
+  assert.match(chatDecision, /每秒 100 条/)
 
   const list = await api('/api/rooms')
   assert.ok(list.rooms.some((r) => r.id === room.id && r.closed === true))

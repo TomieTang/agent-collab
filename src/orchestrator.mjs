@@ -189,10 +189,13 @@ export async function runRoom(ctx, room) {
       ctx.emit(room, { type: 'error', message: e.message })
     }
   } finally {
-    room.finishedAt = new Date().toISOString()
-    await ctx.archive.writeDecision(room, room.round || 1, `${room.status} — ${room.reason}`, unresolved)
+    const finalStatus = room.status
+    room.status = 'finalizing'
+    await ctx.archive.writeDecision(room, room.round || 1, `${finalStatus} — ${room.reason}`, unresolved)
     const files = await changedFiles(ctx, room)
-    await ctx.archive.writeReport(room, { commandLog: lastLog, changedFiles: files, unresolved })
+    await ctx.archive.writeReport(room, { status: finalStatus, commandLog: lastLog, changedFiles: files, unresolved })
+    room.status = finalStatus
+    room.finishedAt = new Date().toISOString()
     await ctx.archive.saveRoom(room)
     await fs.rm(path.join(room.workspace, '.collab'), { force: true }).catch(() => {})
     ctx.emit(room, { type: 'done', status: room.status, reason: room.reason })

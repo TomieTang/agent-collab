@@ -45,7 +45,7 @@ export class MockOpencodeClient {
 
   async ask(sessionID, { agent, text }) {
     await delay(120)
-    if (text.includes('现在轮到你发言')) return { text: chatReply(agent) }
+    if (text.includes('现在轮到你发言')) return { text: chatReply(agent, text) }
     const round = Number((text.match(/轮次：(\d+)/) || [])[1] || 1)
     const mode = (text.match(/任务类型：(\w+)/) || [])[1] || 'build'
     const last = round > 1
@@ -55,10 +55,17 @@ export class MockOpencodeClient {
   }
 }
 
-function chatReply(agent) {
-  if (agent === 'architect') return '先定接口边界：入参统一校验，失败返回错误码而不是抛异常。'
-  if (agent === 'reviewer') return '同意错误码方案，但要确认上游是否可能传 null。src/core/index.ts:42 目前没有判空。'
-  return '已核对 src/core/index.ts:42 确实缺判空，建议补上并加一条用例。\n[END]'
+function chatReply(agent, text) {
+  const answered = text.includes('提问人')
+  if (agent === 'architect') {
+    return '建议先统一入口校验：非法输入返回错误码，不做抛异常。这样上层能统一收敛。'
+  }
+  if (agent === 'reviewer') {
+    if (!answered) return '错误码方向我同意，但现在缺两个关键输入：写入量级和延迟目标，这直接决定批量策略。\n[ASK] 这个接口预期的写入量级是多少？延迟目标是什么量级？'
+    return '按每秒 100 条、P99 < 50ms 来看，批量 64 足够，不需要引入队列。'
+  }
+  if (!answered) return 'src/core/index.ts:42 确实没有判空，这一点可证实。量级问题需要提问人确认。'
+  return '核对通过：src/core/index.ts:42 的判空缺失与量级假设都能对上，建议按批量 64 落地。\n[END]'
 }
 
 function architect(mode, round, last) {

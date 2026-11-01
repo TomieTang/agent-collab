@@ -166,7 +166,7 @@ function normalize(room) {
 }
 
 function statusText(s) {
-  return { created: '待开始', queued: '排队中', running: '进行中', paused: '已暂停', done: '已完成', needs_human: '需人工', error: '出错', stopped: '已停止', interrupted: '中断' }[s] || s
+  return { created: '待开始', queued: '排队中', running: '进行中', paused: '已暂停', waiting_input: '等待你回答', finalizing: '归档中', done: '已完成', needs_human: '需人工', error: '出错', stopped: '已停止', interrupted: '中断' }[s] || s
 }
 
 function renderRoom() {
@@ -197,6 +197,8 @@ function renderRoom() {
   }
 
   const sel = $('#inject-role')
+  sel.classList.toggle('hidden', room.interaction === 'chat')
+  $('#inject-text').placeholder = room.interaction === 'chat' ? '插话：所有人都会看到（Enter 发送）' : '以人的身份指定角色提问'
   sel.textContent = ''
   for (const [key, role] of Object.entries(room.roles)) {
     const o = el('option', '', role.label)
@@ -205,12 +207,27 @@ function renderRoom() {
   }
 
   renderFiles()
+  renderQuestion()
   loadBoard()
+}
+
+function renderQuestion() {
+  const box = $('#question')
+  const q = current.pendingQuestion
+  if (!q) {
+    box.classList.add('hidden')
+    box.textContent = ''
+    return
+  }
+  box.classList.remove('hidden')
+  box.textContent = ''
+  box.append(el('div', 'q-head', `${q.label} 想请你确认`))
+  box.append(el('div', 'q-body', q.question))
 }
 
 function renderControls() {
   const terminal = ['done', 'needs_human', 'stopped', 'error', 'interrupted'].includes(current.status)
-  const running = ['running', 'queued', 'paused'].includes(current.status)
+  const running = ['running', 'queued', 'paused', 'finalizing'].includes(current.status)
   const closed = Boolean(current.closed)
   $('#btn-start').disabled = closed || running
   $('#btn-start').textContent = closed ? '已关闭' : '开始'
@@ -310,6 +327,10 @@ function handleEvent(ev) {
   }
   if (ev.type === 'status') {
     current.status = ev.status
+    if (ev.status === 'running') {
+      current.pendingQuestion = null
+      renderQuestion()
+    }
     renderMeta()
     renderControls()
     refreshRooms()
@@ -324,6 +345,15 @@ function handleEvent(ev) {
     $('#reason').textContent = bits.join(' · ')
   }
   if (ev.type === 'error') $('#reason').textContent = `错误：${ev.message}`
+  if (ev.type === 'waiting_input') {
+    current.pendingQuestion = ev.question
+    current.status = 'waiting_input'
+    renderMeta()
+    renderControls()
+    renderQuestion()
+    $('#inject-text').focus()
+    refreshRooms()
+  }
   if (ev.type === 'closed') {
     current.closed = true
     current.closedAt = ev.closedAt
@@ -493,17 +523,34 @@ $('#btn-close').onclick = async () => {
   }
 }
 
-$('#inject-send').onclick = async () => {
+async function sendInput() {
   const text = $('#inject-text').value.trim()
   if (!text) return
   const role = $('#inject-role').value
   $('#inject-text').value = ''
+  const chat = current.interaction === 'chat'
   try {
-    await api(`/api/rooms/${encodeURIComponent(current.id)}/inject`, { method: 'POST', body: JSON.stringify({ role, text }) })
+    await api(`/api/rooms/${encodeURIComponent(current.id)}/${chat ? 'say' : 'inject'}`, {
+      method: 'POST',
+      body: JSON.stringify({ role, text }),
+    })
+    if (chat) {
+      current.pendingQuestion = null
+      renderQuestion()
+    }
+    refreshRooms()
   } catch (err) {
-    $('#reason').textContent = `插话失败：${err.message}`
+    $('#reason').textContent = `发送失败：${err.message}`
   }
 }
+
+$('#inject-send').onclick = sendInput
+$('#inject-text').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    sendInput()
+  }
+})
 
 for (const btn of document.querySelectorAll('.tabs button')) {
   btn.onclick = () => {

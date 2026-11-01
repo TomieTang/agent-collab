@@ -14,6 +14,7 @@ export function slugify(text, max = 32) {
 export class Archive {
   constructor(root) {
     this.root = root
+    this.locks = new Map()
   }
 
   async init() {
@@ -42,10 +43,21 @@ export class Archive {
   }
 
   async saveRoom(room) {
+    const prev = this.locks.get(room.id) || Promise.resolve()
+    const next = prev
+      .catch(() => {})
+      .then(() => this.writeRoom(room))
+    this.locks.set(room.id, next)
+    return next
+  }
+
+  async writeRoom(room) {
     room.updatedAt = new Date().toISOString()
     const dir = this.roomDir(room.id)
     await fs.mkdir(dir, { recursive: true })
-    await fs.writeFile(path.join(dir, 'room.json'), JSON.stringify(room, null, 2), 'utf8')
+    const tmp = path.join(dir, `room.json.${process.pid}.tmp`)
+    await fs.writeFile(tmp, JSON.stringify(room, null, 2), 'utf8')
+    await fs.rename(tmp, path.join(dir, 'room.json'))
   }
 
   async readRoom(id) {
@@ -160,6 +172,7 @@ ${unresolved.length ? unresolved.map((u) => `- ${u}`).join('\n') : '- 无'}
 
   async writeReport(room, extra) {
     const files = await this.listFiles(room)
+    const status = extra?.status || room.status
     const content = `# REPORT — ${room.id}
 
 ## 任务（${room.mode || 'build'}）
@@ -168,7 +181,7 @@ ${room.task || room.requirement}
 
 ## 结果
 
-- 状态：\`${room.status}\`
+- 状态：\`${status}\`
 - 轮次：${room.round}/${room.maxRounds}
 - 结束时间：${new Date().toISOString()}
 - 原因：${room.reason || '-'}

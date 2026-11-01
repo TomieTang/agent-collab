@@ -251,7 +251,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { room })
     }
 
-    const m = p.match(/^\/api\/rooms\/([^/]+)(?:\/(start|pause|stop|inject|events|file|close))?$/)
+    const m = p.match(/^\/api\/rooms\/([^/]+)(?:\/(start|pause|stop|inject|say|events|file|close))?$/)
     if (m) {
       const room = await ensureRoom(decodeURIComponent(m[1]))
       const action = m[2]
@@ -340,7 +340,44 @@ ${errors.length ? `- 异常：\n${errors.map((e) => `  - ${e}`).join('\n')}` : '
         return json(res, 200, { ok: true })
       }
 
+      if (action === 'say') {
+        const { text } = await body(req)
+        const t = String(text || '').trim()
+        if (!t) return json(res, 400, { error: '内容不能为空' })
+        room.round = room.round || 0
+        emit(room, { type: 'message', role: 'human', label: '提问人', kind: 'human', round: room.round, content: t })
+        await archive.appendTranscript(room, {
+          round: room.round,
+          role: 'human',
+          label: '提问人',
+          model: '-',
+          kind: 'human',
+          content: t,
+        })
+        room.pendingQuestion = null
+        await archive.saveRoom(room)
+        if (room.interaction === 'chat' && ['waiting_input', 'needs_human', 'created', 'paused'].includes(room.status)) {
+          room.control = 'run'
+          startRoom(room)
+        }
+        return json(res, 200, { ok: true })
+      }
+
       if (action === 'inject') {
+        if (room.interaction === 'chat') {
+          const { text } = await body(req)
+          const t = String(text || '').trim()
+          if (!t) return json(res, 400, { error: '内容不能为空' })
+          emit(room, { type: 'message', role: 'human', label: '提问人', kind: 'human', round: room.round || 0, content: t })
+          await archive.appendTranscript(room, { round: room.round || 0, role: 'human', label: '提问人', model: '-', kind: 'human', content: t })
+          room.pendingQuestion = null
+          await archive.saveRoom(room)
+          if (['waiting_input', 'needs_human', 'created', 'paused'].includes(room.status)) {
+            room.control = 'run'
+            startRoom(room)
+          }
+          return json(res, 200, { ok: true })
+        }
         const { role, text } = await body(req)
         const target = room.roles[role]
         if (!target) return json(res, 400, { error: '未知角色' })

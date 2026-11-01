@@ -80,11 +80,15 @@
 <div id="modal" class="modal hidden">
   <form id="create-form" class="modal-box">
     <h3>新建任务</h3>
-    <label>任务类型<select id="f-mode"></select></label>
+    <label>协作方式<select id="f-interaction">
+      <option value="chat">对话讨论（三个模型像群聊一样互相发言）</option>
+      <option value="pipeline">流程协作（提案 → 评审 → 核验 → 验收命令）</option>
+    </select></label>
+    <label id="mode-row">任务类型<select id="f-mode"></select></label>
     <div id="mode-hint" class="muted"></div>
     <label>任务描述<textarea id="f-task" rows="5" required placeholder="要做什么？"></textarea></label>
-    <label>验收命令（每行一条，必须全部 exit 0；开发类必填）<textarea id="f-done" rows="3" placeholder="npm test"></textarea></label>
-    <label>最大轮次<input id="f-rounds" type="number" value="3" min="1" max="8" /></label>
+    <label id="done-row">验收命令（每行一条，必须全部 exit 0；仅流程协作需要）<textarea id="f-done" rows="3" placeholder="npm test"></textarea></label>
+    <label id="rounds-row">最大轮次<input id="f-rounds" type="number" value="3" min="1" max="8" /></label>
     <div id="role-preview" class="role-preview"></div>
     <div class="modal-actions">
       <button type="button" id="cancel-create">取消</button>

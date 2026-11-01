@@ -7,6 +7,7 @@ import { Archive, slugify } from './src/archive.mjs'
 import { OpencodeClient } from './src/oc.mjs'
 import { MockOpencodeClient } from './src/mock-oc.mjs'
 import { runRoom } from './src/orchestrator.mjs'
+import { runChat } from './src/chat.mjs'
 import { prepareWorkspace } from './src/workspace.mjs'
 import { MODES, modeList } from './src/modes.mjs'
 
@@ -85,6 +86,7 @@ async function ensureRoom(id) {
   if (rooms.has(id)) return rooms.get(id)
   const room = await archive.readRoom(id)
   room.control = 'run'
+  room.interaction = room.interaction || 'pipeline'
   room.messages = room.messages || []
   rooms.set(id, room)
   return room
@@ -100,7 +102,12 @@ async function createRoom(payload) {
   const task = String(payload.task || payload.requirement || '').trim()
   if (!task) throw badRequest('任务描述不能为空')
   const mode = MODES[payload.mode] ? payload.mode : 'build'
-  if (MODES[mode].requireCommands && !(Array.isArray(payload.doneWhen) && payload.doneWhen.length)) {
+  const interaction = payload.interaction === 'pipeline' ? 'pipeline' : 'chat'
+  if (
+    interaction === 'pipeline' &&
+    MODES[mode].requireCommands &&
+    !(Array.isArray(payload.doneWhen) && payload.doneWhen.length)
+  ) {
     throw badRequest(`${MODES[mode].label}必须至少设置一条验收命令`)
   }
   const maxRounds = Math.min(Math.max(Number(payload.maxRounds || config.maxRounds), 1), 8)
@@ -112,12 +119,14 @@ async function createRoom(payload) {
   const roles = {}
   for (const [key, def] of Object.entries(config.roles)) {
     const sessionID = await oc.createSession(`${key} · ${slugify(task, 24)}`)
-    roles[key] = { ...def, label: MODES[mode].roles[key] || def.label, sessionID }
+    const label = interaction === 'chat' ? def.model.split('/').pop() : MODES[mode].roles[key] || def.label
+    roles[key] = { ...def, label, sessionID }
   }
   const room = {
     id,
     task,
     mode,
+    interaction,
     doneWhen,
     maxRounds,
     round: 0,
@@ -156,7 +165,8 @@ function pump() {
     if (room.control === 'stop') continue
     runningCount += 1
     active.set(room.id, true)
-    runRoom(ctx, room)
+    const runner = room.interaction === 'chat' ? runChat : runRoom
+    runner(ctx, room)
       .catch((e) => {
         room.status = 'error'
         room.reason = e.message

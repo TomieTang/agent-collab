@@ -65,6 +65,7 @@ export class Archive {
           id: room.id,
           task: room.task || room.requirement,
           mode: room.mode || 'build',
+          interaction: room.interaction || 'pipeline',
           status: room.status,
           round: room.round,
           maxRounds: room.maxRounds,
@@ -137,7 +138,7 @@ export class Archive {
     const proposal = (await this.readArtifact(room, `round-${round}/proposal-architect.md`)) || ''
     const content = `# DECISION — ${room.id}
 
-- 任务类型：${room.mode || 'build'}
+- 任务类型：${room.mode || 'build'} / ${room.interaction || 'pipeline'}
 - 状态：${verdict}
 - 轮次：${round}/${room.maxRounds}
 - 模型：architect=${room.roles.architect.model} / reviewer=${room.roles.reviewer.model} / verifier=${room.roles.verifier.model}

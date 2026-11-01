@@ -182,7 +182,13 @@ function renderRoom() {
 
   const chat = $('#tab-chat')
   chat.textContent = ''
-  for (const [key, role] of Object.entries(room.roles)) {
+  if (room.interaction === 'chat') {
+    chat.classList.add('timeline')
+    for (const m of room.messages) chat.append(msgNode(m, true))
+  } else {
+    chat.classList.remove('timeline')
+  }
+  for (const [key, role] of Object.entries(room.interaction === 'chat' ? {} : room.roles)) {
     const col = el('div', 'col')
     col.dataset.role = key
     col.append(el('h4', '', `${role.label} · ${role.model}`))
@@ -231,9 +237,11 @@ function renderFiles() {
   if (!current.artifacts.length) fl.append(el('li', 'muted', '暂无文件'))
 }
 
-function msgNode(m) {
+function msgNode(m, withLabel) {
   const n = el('div', 'msg' + (m.kind === 'human' ? ' human' : ''))
+  n.dataset.role = m.role
   const head = el('div', 'msg-head')
+  if (withLabel && m.label) head.append(el('span', 'who', m.label))
   head.append(el('span', '', `R${m.round} · ${m.kind}`))
   head.append(el('span', '', new Date(m.at).toLocaleTimeString()))
   n.append(head, el('pre', '', m.content))
@@ -255,6 +263,19 @@ function openStream(id) {
 }
 
 function handleEvent(ev) {
+  if (ev.type === 'turn') {
+    $('#reason').textContent = `第 ${ev.turn}/${ev.maxTurns} 次发言：${ev.role}`
+  }
+  if (ev.type === 'message' && current.interaction === 'chat') {
+    const box = $('#tab-chat')
+    box.querySelector('.thinking')?.remove()
+    const m = { role: ev.role, label: ev.label, round: ev.round, kind: ev.kind, content: ev.content, at: ev.at }
+    current.messages.push(m)
+    box.append(msgNode(m, true))
+    box.scrollTop = box.scrollHeight
+    if (ev.kind !== 'human') refreshArtifacts()
+    return
+  }
   if (ev.type === 'message') {
     const col = document.querySelector(`.chat .col[data-role="${ev.role}"]`)
     if (!col) return
@@ -267,6 +288,16 @@ function handleEvent(ev) {
       loadBoard()
       refreshArtifacts()
     }
+  }
+  if (ev.type === 'thinking' && current.interaction === 'chat') {
+    const box = $('#tab-chat')
+    if (!box.querySelector('.thinking')) {
+      const t = el('div', 'msg thinking', `${ev.role} 正在输入…`)
+      t.style.opacity = '.55'
+      box.append(t)
+      box.scrollTop = box.scrollHeight
+    }
+    return
   }
   if (ev.type === 'thinking') {
     const col = document.querySelector(`.chat .col[data-role="${ev.role}"]`)
@@ -355,7 +386,7 @@ function applyMode(id) {
   const m = modes?.find((x) => x.id === id)
   if (!m) return
   $('#mode-hint').textContent = m.hint
-  $('#f-done').required = m.requireCommands
+  $('#f-done').required = !$('#f-interaction').value.includes('chat') && m.requireCommands
   $('#f-done').placeholder = m.requireCommands ? 'npm test（必填）' : '可选，例如复现脚本'
   const box = $('#role-preview')
   box.textContent = ''
@@ -378,6 +409,21 @@ async function openCreate() {
   }
   sel.onchange = () => applyMode(sel.value)
   applyMode(sel.value)
+}
+
+function applyInteraction() {
+  const chat = $('#f-interaction').value === 'chat'
+  $('#rounds-row').firstChild.textContent = chat ? '每个模型最多发言轮数' : '最大轮次'
+  $('#f-done').required = false
+  $('#f-done').disabled = chat
+  $('#f-done').placeholder = chat ? '对话模式下不需要' : 'npm test'
+  $('#mode-row').style.opacity = chat ? '.5' : '1'
+  $('#f-mode').disabled = chat
+}
+
+$('#f-interaction').onchange = () => {
+  applyInteraction()
+  if (!$('#f-mode').disabled) applyMode($('#f-mode').value)
 }
 
 $('#login-form').onsubmit = async (e) => {
@@ -404,6 +450,7 @@ $('#create-form').onsubmit = async (e) => {
   e.preventDefault()
   $('#create-error').textContent = ''
   const payload = {
+    interaction: $('#f-interaction').value,
     mode: $('#f-mode').value,
     task: $('#f-task').value,
     doneWhen: $('#f-done').value.split('\n').map((s) => s.trim()).filter(Boolean),

@@ -45,6 +45,7 @@ export class MockOpencodeClient {
 
   async ask(sessionID, { agent, text }) {
     await delay(120)
+    if (text.includes('现在轮到你发言')) return { text: chatReply(agent) }
     const round = Number((text.match(/轮次：(\d+)/) || [])[1] || 1)
     const mode = (text.match(/任务类型：(\w+)/) || [])[1] || 'build'
     const last = round > 1
@@ -52,6 +53,12 @@ export class MockOpencodeClient {
     if (agent === 'reviewer') return { text: reviewer(mode, round, last) }
     return { text: verifier(mode, round, last) }
   }
+}
+
+function chatReply(agent) {
+  if (agent === 'architect') return '先定接口边界：入参统一校验，失败返回错误码而不是抛异常。'
+  if (agent === 'reviewer') return '同意错误码方案，但要确认上游是否可能传 null。src/core/index.ts:42 目前没有判空。'
+  return '已核对 src/core/index.ts:42 确实缺判空，建议补上并加一条用例。\n[END]'
 }
 
 function architect(mode, round, last) {

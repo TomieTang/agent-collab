@@ -86,6 +86,7 @@ try {
     body: JSON.stringify({
       task: '给配置模块增加校验：非法输入返回 EINVAL，并补一条超时用例',
       mode: 'build',
+      interaction: 'pipeline',
       doneWhen: ['node -e "process.exit(0)"'],
       maxRounds: 3,
     }),
@@ -132,7 +133,7 @@ try {
   const req2 = '再补一个并发用例：同一需求跑两次不互相覆盖'
   const { room: room2 } = await api('/api/rooms', {
     method: 'POST',
-    body: JSON.stringify({ task: req2, mode: 'build', doneWhen: ['node -e "process.exit(0)"'], maxRounds: 2 }),
+    body: JSON.stringify({ task: req2, mode: 'build', interaction: 'pipeline', doneWhen: ['node -e "process.exit(0)"'], maxRounds: 2 }),
   })
   assert.notEqual(room2.roles.architect.sessionID, room.roles.architect.sessionID)
   assert.notEqual(room2.workspace, room.workspace)
@@ -155,7 +156,7 @@ try {
   const noCmd = await fetch(BASE + '/api/rooms', {
     method: 'POST',
     headers: { 'content-type': 'application/json', cookie },
-    body: JSON.stringify({ task: '没有验收命令的开发任务', mode: 'build' }),
+    body: JSON.stringify({ task: '没有验收命令的流程任务', mode: 'build', interaction: 'pipeline' }),
   })
   assert.equal(noCmd.status, 400)
 
@@ -164,6 +165,7 @@ try {
     body: JSON.stringify({
       task: '训练脚本偶发 hang，日志在 logs/train.log，定位根因',
       mode: 'diagnose',
+      interaction: 'pipeline',
       maxRounds: 2,
     }),
   })
@@ -198,10 +200,33 @@ try {
   const decideStill = await fs.stat(path.join(dir, 'DECISION.md'))
   assert.ok(decideStill, 'closing must not remove archive')
 
+  const { room: chat } = await api('/api/rooms', {
+    method: 'POST',
+    body: JSON.stringify({ task: '讨论一下错误处理该用错误码还是异常', interaction: 'chat', maxRounds: 2 }),
+  })
+  assert.equal(chat.interaction, 'chat')
+  await api(`/api/rooms/${encodeURIComponent(chat.id)}/start`, { method: 'POST' })
+  let c = null
+  for (let i = 0; i < 100; i++) {
+    await sleep(300)
+    const { room: r } = await api(`/api/rooms/${encodeURIComponent(chat.id)}`)
+    if (['done', 'needs_human', 'error', 'stopped'].includes(r.status)) {
+      c = r
+      break
+    }
+  }
+  assert.equal(c?.status, 'done', `chat room: ${c?.status} ${c?.reason}`)
+  assert.equal(c.messages.length, 3, 'chat should alternate three speakers once')
+  const chatTranscript = await fs.readFile(path.join(env.COLLAB_ARCHIVE, chat.id, 'transcript.md'), 'utf8')
+  assert.equal((chatTranscript.match(/· chat/g) || []).length, 3)
+  const chatDecision = await fs.readFile(path.join(env.COLLAB_ARCHIVE, chat.id, 'DECISION.md'), 'utf8')
+  assert.match(chatDecision, /模式：chat/)
+
   const list = await api('/api/rooms')
   assert.ok(list.rooms.some((r) => r.id === room.id && r.closed === true))
   assert.ok(list.rooms.some((r) => r.id === room2.id))
   assert.ok(list.rooms.some((r) => r.id === diag.id && r.mode === 'diagnose'))
+  assert.ok(list.rooms.some((r) => r.id === chat.id && r.interaction === 'chat'))
 
   console.log('PASS 需求归档流程')
   console.log(`  房间：${room.id}`)

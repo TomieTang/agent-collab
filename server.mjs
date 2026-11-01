@@ -7,7 +7,7 @@ import { Archive, slugify } from './src/archive.mjs'
 import { OpencodeClient } from './src/oc.mjs'
 import { MockOpencodeClient } from './src/mock-oc.mjs'
 import { runRoom } from './src/orchestrator.mjs'
-import { runChat } from './src/chat.mjs'
+import { runChat, finalizeChat } from './src/chat.mjs'
 import { prepareWorkspace } from './src/workspace.mjs'
 import { MODES, modeList } from './src/modes.mjs'
 
@@ -328,6 +328,11 @@ ${errors.length ? `- 异常：\n${errors.map((e) => `  - ${e}`).join('\n')}` : '
 
       if (action === 'stop') {
         room.control = 'stop'
+        if (room.interaction === 'chat' && ['waiting_input', 'created', 'paused'].includes(room.status)) {
+          room.reason = room.reason || '人工停止'
+          await finalizeChat(ctx, room, 'stopped')
+          return json(res, 200, { ok: true, finalized: true })
+        }
         const i = queue.findIndex((r) => r.id === room.id)
         if (i >= 0) {
           queue.splice(i, 1)

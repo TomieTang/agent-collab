@@ -143,15 +143,8 @@ export async function runChat(ctx, room) {
     }
   } finally {
     await ctx.archive.saveRoom(room)
-    if (room.status !== 'waiting_input' && room.status !== 'running' && room.status !== 'paused') {
-      const finalStatus = room.status
-      room.status = 'finalizing'
-      await writeChatDecision(ctx, room, finalStatus)
-      await ctx.archive.writeReport(room, { status: finalStatus, commandLog: '', changedFiles: [], unresolved: [] })
-      room.status = finalStatus
-      room.finishedAt = room.finishedAt || new Date().toISOString()
-      await ctx.archive.saveRoom(room)
-      ctx.emit(room, { type: 'done', status: finalStatus, reason: room.reason })
+    if (!['waiting_input', 'running', 'paused'].includes(room.status)) {
+      await finalizeChat(ctx, room, room.status)
     }
   }
   return room
@@ -186,4 +179,14 @@ ${body}
 `
   await fs.mkdir(ctx.archive.roomDir(room.id), { recursive: true })
   await ctx.archive.writeArtifact(room, 'DECISION.md', text)
+}
+
+export async function finalizeChat(ctx, room, status) {
+  room.status = 'finalizing'
+  await writeChatDecision(ctx, room, status)
+  await ctx.archive.writeReport(room, { status, commandLog: '', changedFiles: [], unresolved: [] })
+  room.status = status
+  room.finishedAt = room.finishedAt || new Date().toISOString()
+  await ctx.archive.saveRoom(room)
+  ctx.emit(room, { type: 'done', status, reason: room.reason })
 }

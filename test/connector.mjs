@@ -99,7 +99,8 @@ try {
   const now = new Date().toISOString()
   discussions.push(
     { number: 1, title: 'TASK-ONE 讨论接口设计', md_content: '实现 A', author: { login: 'tangjie66' }, created_at: now, is_closed: 0 },
-    { number: 2, title: 'TASK-TWO 讨论错误处理', md_content: '实现 B', author: { login: 'tangjie66' }, created_at: now, is_closed: 0 }
+    { number: 2, title: 'TASK-TWO 讨论错误处理', md_content: '实现 B', author: { login: 'tangjie66' }, created_at: now, is_closed: 0 },
+    { number: 3, title: 'TASK-THREE 保持等待', md_content: '实现 C', author: { login: 'tangjie66' }, created_at: now, is_closed: 0 }
   )
 
   const asked = (n) => (comments[n] || []).some((c) => String(c.md_content).includes('需要你确认'))
@@ -152,7 +153,8 @@ try {
 
   const after = JSON.parse(await fs.readFile(stateFile, 'utf8'))
   assert.equal(Object.keys(after).filter((k) => k !== '__meta').length, before)
-  for (const key of ['o/r#1', 'o/r#2']) {
+  for (const key of ['o/r#1', 'o/r#2', 'o/r#3']) {
+    assert.equal(after[key].finished, true, `${key} should be finalized on shutdown`)
     assert.equal(after[key].archived, true, `${key} should be archived on shutdown/finish`)
     const dir = path.join(env.COLLAB_ARCHIVE, after[key].roomId)
     const stat = await fs.stat(path.join(dir, 'REPORT.md')).catch(() => null)

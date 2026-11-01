@@ -19,6 +19,14 @@ const env = {
   COLLAB_HOST: '127.0.0.1',
 }
 await fs.mkdir(env.COLLAB_WORKSPACE, { recursive: true })
+await fs.writeFile(path.join(env.COLLAB_WORKSPACE, 'README.md'), '# demo workspace\n')
+for (const args of [['init', '-q', '-b', 'main'], ['add', '-A'], ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'init']]) {
+  await new Promise((res, rej) =>
+    import('node:child_process').then(({ execFile }) =>
+      execFile('git', args, { cwd: env.COLLAB_WORKSPACE }, (e) => (e ? rej(e) : res()))
+    )
+  )
+}
 
 const server = spawn('node', ['server.mjs'], { cwd: path.resolve(import.meta.dirname, '..'), env, stdio: ['ignore', 'pipe', 'pipe'] })
 server.stderr.on('data', (d) => process.stderr.write(`[server] ${d}`))
@@ -116,8 +124,36 @@ try {
   assert.match(report, /状态：`done`/)
   assert.match(report, /node -e/)
 
+  const ws1 = path.join(env.COLLAB_WORKSPACE, '.worktrees', room.id)
+  assert.ok((await fs.stat(ws1).catch(() => null))?.isDirectory(), 'room should get its own worktree')
+  assert.equal(final.isolated, true)
+
+  const req2 = '再补一个并发用例：同一需求跑两次不互相覆盖'
+  const { room: room2 } = await api('/api/rooms', {
+    method: 'POST',
+    body: JSON.stringify({ requirement: req2, doneWhen: ['node -e "process.exit(0)"'], maxRounds: 2 }),
+  })
+  assert.notEqual(room2.roles.architect.sessionID, room.roles.architect.sessionID)
+  assert.notEqual(room2.workspace, room.workspace)
+  await api(`/api/rooms/${room2.id}/start`, { method: 'POST' })
+  await api(`/api/rooms/${room.id}/start`, { method: 'POST' })
+
+  let final2 = null
+  for (let i = 0; i < 120; i++) {
+    await sleep(300)
+    const { room: r } = await api(`/api/rooms/${encodeURIComponent(room2.id)}`)
+    if (['done', 'needs_human', 'error', 'stopped'].includes(r.status)) {
+      final2 = r
+      break
+    }
+  }
+  assert.equal(final2?.status, 'done', `second room: ${final2?.status} ${final2?.reason}`)
+  assert.equal(room2.isolated, true)
+  assert.ok((await fs.stat(path.join(env.COLLAB_WORKSPACE, '.worktrees', room2.id)).catch(() => null))?.isDirectory())
+
   const list = await api('/api/rooms')
   assert.ok(list.rooms.some((r) => r.id === room.id))
+  assert.ok(list.rooms.some((r) => r.id === room2.id))
 
   console.log('PASS 需求归档流程')
   console.log(`  房间：${room.id}`)

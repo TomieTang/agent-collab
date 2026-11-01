@@ -77,7 +77,7 @@ async function runDoneWhen(ctx, room) {
   let ok = true
   for (const cmd of room.doneWhen) {
     ctx.emit(room, { type: 'command', command: cmd, round: room.round })
-    const r = await sh(cmd, ctx.workspace, ctx.config.commandTimeoutMs)
+    const r = await sh(cmd, room.workspace, ctx.config.commandTimeoutMs)
     lines.push(`$ ${cmd}\nexit=${r.code}\n${r.out.trim()}`)
     if (r.code !== 0) ok = false
   }
@@ -87,8 +87,8 @@ async function runDoneWhen(ctx, room) {
   return { ok, log }
 }
 
-async function changedFiles(ctx) {
-  const r = await sh('git status --porcelain', ctx.workspace, 30000)
+async function changedFiles(ctx, room) {
+  const r = await sh('git status --porcelain', room.workspace, 30000)
   if (r.code !== 0) return []
   return r.out
     .split('\n')
@@ -98,7 +98,7 @@ async function changedFiles(ctx) {
 }
 
 async function linkBoard(ctx, room) {
-  const link = path.join(ctx.workspace, '.collab')
+  const link = path.join(room.workspace, '.collab')
   try {
     await fs.rm(link, { force: true })
   } catch {}
@@ -185,10 +185,10 @@ export async function runRoom(ctx, room) {
   } finally {
     room.finishedAt = new Date().toISOString()
     await ctx.archive.writeDecision(room, room.round || 1, `${room.status} — ${room.reason}`, unresolved)
-    const files = await changedFiles(ctx)
+    const files = await changedFiles(ctx, room)
     await ctx.archive.writeReport(room, { commandLog: lastLog, changedFiles: files, unresolved })
     await ctx.archive.saveRoom(room)
-    await fs.rm(path.join(ctx.workspace, '.collab'), { force: true }).catch(() => {})
+    await fs.rm(path.join(room.workspace, '.collab'), { force: true }).catch(() => {})
     ctx.emit(room, { type: 'done', status: room.status, reason: room.reason })
   }
   return room

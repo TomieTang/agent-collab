@@ -14,7 +14,7 @@
     "model": "cannbot/glm-5.3",
     "agent": "reviewer",
     "round": 2,
-    "ms": 124,
+    "ms": 123,
     "tokens": null
   },
   {
@@ -23,7 +23,34 @@
     "model": "cannbot/deepseek-v4.1-flash",
     "agent": "verifier",
     "round": 2,
-    "ms": 125,
+    "ms": 124,
+    "tokens": null
+  },
+  {
+    "role": "architect",
+    "kind": "proposal",
+    "model": "cannbot/deepseek-v4-pro",
+    "agent": "architect",
+    "round": 2,
+    "ms": 123,
+    "tokens": null
+  },
+  {
+    "role": "reviewer",
+    "kind": "review",
+    "model": "cannbot/glm-5.3",
+    "agent": "reviewer",
+    "round": 2,
+    "ms": 122,
+    "tokens": null
+  },
+  {
+    "role": "verifier",
+    "kind": "verify",
+    "model": "cannbot/deepseek-v4.1-flash",
+    "agent": "verifier",
+    "round": 2,
+    "ms": 122,
     "tokens": null
   }
 ]

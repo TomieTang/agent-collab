@@ -122,3 +122,23 @@ main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .room-head { flex-wrap: wrap; }
   .inject select { width: 110px; }
 }
+
+.tabbar {
+  display: flex; gap: 4px; padding: 8px 12px 0; overflow-x: auto;
+  border-bottom: 1px solid var(--line); flex: none;
+}
+.tab {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border-radius: 8px 8px 0 0; background: var(--panel); border: 1px solid var(--line);
+  border-bottom: none; color: var(--muted); white-space: nowrap; font-size: 12.5px;
+}
+.tab.active { background: var(--panel2); color: var(--text); border-color: #3b4250; }
+.tab-x { opacity: .55; padding: 0 2px; }
+.tab-x:hover { opacity: 1; color: var(--danger); }
+.tab-add { color: var(--muted); font-weight: 600; padding: 6px 12px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); display: inline-block; flex: none; }
+.dot.running { background: var(--accent); animation: pulse 1.2s infinite; }
+.dot.done { background: var(--ok); }
+.dot.queued, .dot.needs_human, .dot.stopped, .dot.interrupted { background: var(--warn); }
+.dot.error { background: var(--danger); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }

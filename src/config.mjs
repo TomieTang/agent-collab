@@ -52,6 +52,7 @@ export const config = {
   archiveDir: env.COLLAB_ARCHIVE || path.join(ROOT, 'requirements'),
   workspace: env.COLLAB_WORKSPACE || path.join(ROOT, 'workspace'),
   maxRounds: Number(env.COLLAB_MAX_ROUNDS || 3),
+  concurrency: Number(env.COLLAB_CONCURRENCY || 2),
   commandTimeoutMs: Number(env.COLLAB_CMD_TIMEOUT || 600000),
   oc: {
     url: env.OC_URL || 'http://127.0.0.1:4096',

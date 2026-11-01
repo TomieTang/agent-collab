@@ -71,6 +71,7 @@ COLLAB_WORKSPACE=/path/to/your/repo
 | `COLLAB_WORKSPACE` | `./workspace` | agent 实际改代码的仓库 |
 | `COLLAB_ARCHIVE` | `./requirements` | 归档根目录 |
 | `COLLAB_MAX_ROUNDS` | 3 | 房间默认轮次上限（1–8） |
+| `COLLAB_CONCURRENCY` | 2 | 同时运行的房间数，超出排 `queued` |
 | `OC_URL` / `OC_USER` / `OC_PASS` | `http://127.0.0.1:4096` / `opencode` / 空 | opencode server 连接信息 |
 | `COLLAB_MODEL_ARCHITECT` 等 | 见上文 | 覆盖角色模型 |
 | `COLLAB_MOCK` | 0 | `1` 启用 MOCK 适配器 |
@@ -96,6 +97,18 @@ REPORT.md              结果、分工、变更文件、证据
 ```
 
 运行期会在工作区创建 `.collab` 软链指向当前房间目录，让 agent 用 `.collab/round-N/...` 读写产物；房间结束后自动移除。
+
+## 多需求并行与隔离
+
+网页顶部是页签栏，一个页签 = 一个需求 = 一个房间：
+
+- 每个房间单独创建 3 个 session，模型上下文互不可见
+- 归档写入各自的 `requirements/<id>/`，互不覆盖
+- 创建房间时在 `COLLAB_WORKSPACE/.worktrees/<id>` 建一个 git worktree 和 `collab/<id>` 分支，代码改动互不覆盖
+- 房间结束后 worktree 保留，方便 `git diff` 对比后手工挑一版合并
+- 关闭页签只是从界面移除，归档与 worktree 都还在
+
+`COLLAB_CONCURRENCY`（默认 2）限制同时运行的房间数，其余显示「排队中」。工作区不是 git 仓库或还没有提交时无法建 worktree，会退回共享目录，此时请把并发设为 1。
 
 ## 收敛规则
 
@@ -140,5 +153,6 @@ requirements/        需求归档
 
 - 单人使用，单密码鉴权，无多租户。
 - 轮次与命令超时兜底，但没有 token 预算硬限制。
-- 同一时刻同一房间只有一个 agent 在跑（共享工作区写冲突的规避方式）。
+- 同一房间内串行执行各角色，不同房间可并行（依赖 worktree 隔离）。
+- 并行房间共用 CANNBOT 网关配额，同一账号并发放太多会互相拖慢。
 - CANNBOT 的 JWT 过期后 `/provider` 只剩 `cannbot-error`，`/api/health` 会提示重新登录。

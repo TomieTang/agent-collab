@@ -1,5 +1,11 @@
 export const CHECKLIST = ['需求覆盖', '接口契约', '异常路径', '并发与资源', '安全', '测试充分性']
 
+function where(room) {
+  return `工作区（绝对路径）：\`${room.workspace}\`
+归档目录（= 工作区下的 .collab）：\`${room.workspace}/.collab\`
+所有 bash 命令请自行加 \`cd ${room.workspace} && \` 前缀；涉及其他需求目录的内容一律不要读写。`
+}
+
 export function proposalPrompt(room, round) {
   const prev = round > 1 ? `- 上一轮评审：\`.collab/round-${round - 1}/review-reviewer.md\`（必须逐条回应）` : ''
   return `你是本协作房间的 Architect（主设计 + 主实现）。
@@ -8,6 +14,7 @@ export function proposalPrompt(room, round) {
 ${room.requirement}
 
 轮次：${round}/${room.maxRounds}
+${where(room)}
 共享状态板：\`.collab/board.md\`（先读）
 ${prev}
 
@@ -26,6 +33,7 @@ export function reviewPrompt(room, round) {
 ${room.requirement}
 
 轮次：${round}/${room.maxRounds}
+${where(room)}
 评审对象：\`.collab/round-${round}/proposal-architect.md\` 与仓库当前代码（用 git diff 看改动）
 
 必须逐项给出结论，六项缺一不可：
@@ -53,6 +61,7 @@ export function verifyPrompt(room, round, doneWhen) {
 ${room.requirement}
 
 轮次：${round}/${room.maxRounds}
+${where(room)}
 核验对象：\`.collab/round-${round}/proposal-architect.md\`、\`.collab/round-${round}/review-reviewer.md\` 与仓库当前代码
 
 任务：

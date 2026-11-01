@@ -7,12 +7,16 @@ import { Archive, slugify } from './src/archive.mjs'
 import { OpencodeClient } from './src/oc.mjs'
 import { MockOpencodeClient } from './src/mock-oc.mjs'
 import { runRoom } from './src/orchestrator.mjs'
+import { prepareWorkspace } from './src/workspace.mjs'
 
 const auth = makeAuth(config.secret)
 const archive = new Archive(config.archiveDir)
 const oc = config.mock ? new MockOpencodeClient() : new OpencodeClient(config.oc)
 const rooms = new Map()
 const active = new Map()
+const queue = []
+let runningCount = 0
+const concurrency = Math.max(1, config.concurrency)
 const subs = new Map()
 const failCount = new Map()
 
@@ -93,6 +97,7 @@ async function createRoom(payload) {
     .map((s) => String(s).trim())
     .filter(Boolean)
   const id = archive.newId(requirement)
+  const ws = await prepareWorkspace(config.workspace, id)
   const roles = {}
   for (const [key, def] of Object.entries(config.roles)) {
     const sessionID = await oc.createSession(`${key} · ${slugify(requirement, 24)}`)
@@ -110,6 +115,10 @@ async function createRoom(payload) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     roles,
+    workspace: ws.dir,
+    isolated: Boolean(ws.isolated),
+    isolationReason: ws.reason || '',
+    worktreeBranch: ws.branch || '',
     artifacts: [],
     messages: [],
   }
@@ -119,15 +128,33 @@ async function createRoom(payload) {
 }
 
 function startRoom(room) {
-  if (active.has(room.id)) return false
-  const p = runRoom(ctx, room)
-    .catch((e) => {
-      room.status = 'error'
-      room.reason = e.message
-    })
-    .finally(() => active.delete(room.id))
-  active.set(room.id, p)
+  if (active.has(room.id) || queue.some((r) => r.id === room.id)) return false
+  room.status = 'queued'
+  room.control = 'run'
+  emit(room, { type: 'status', status: 'queued' })
+  archive.saveRoom(room).catch(() => {})
+  queue.push(room)
+  pump()
   return true
+}
+
+function pump() {
+  while (runningCount < concurrency && queue.length) {
+    const room = queue.shift()
+    if (room.control === 'stop') continue
+    runningCount += 1
+    active.set(room.id, true)
+    runRoom(ctx, room)
+      .catch((e) => {
+        room.status = 'error'
+        room.reason = e.message
+      })
+      .finally(() => {
+        active.delete(room.id)
+        runningCount -= 1
+        pump()
+      })
+  }
 }
 
 async function serveStatic(req, res, urlPath) {
@@ -175,7 +202,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/health') {
       const h = await oc.health()
-      return json(res, 200, { ...h, mock: Boolean(config.mock), workspace: config.workspace })
+      return json(res, 200, { ...h, mock: Boolean(config.mock), workspace: config.workspace, concurrency, queued: queue.length, running: runningCount })
     }
 
     if (p.startsWith('/api/')) {
@@ -236,6 +263,14 @@ const server = http.createServer(async (req, res) => {
 
       if (action === 'stop') {
         room.control = 'stop'
+        const i = queue.findIndex((r) => r.id === room.id)
+        if (i >= 0) {
+          queue.splice(i, 1)
+          room.status = 'stopped'
+          room.reason = '排队中被停止'
+          await archive.saveRoom(room)
+          emit(room, { type: 'done', status: 'stopped', reason: room.reason })
+        }
         await Promise.all(Object.values(room.roles).map((r) => oc.abort(r.sessionID)))
         return json(res, 200, { ok: true })
       }

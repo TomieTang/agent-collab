@@ -43,10 +43,18 @@ POST /api/rooms/:id/start
 5. **验收命令由编排器执行**：不信任 agent 报告的命令结果，编排器自己跑一遍，退出码说了算。
 6. **同族不互证**：DeepSeek-Pro 与 DeepSeek-Flash 判为相关证据，收敛只认异族（GLM）+ 命令结果。
 
+## 多房间隔离
+
+- 归档：每房间一个目录，天然隔离。
+- 会话：每房间每角色一个 session，opencode 按 session 隔离上下文。
+- 代码：每房间一个 git worktree（`COLLAB_WORKSPACE/.worktrees/<id>`）+ 一个分支，改动互不覆盖；结束后保留供人工对比合并。
+- 执行：`COLLAB_CONCURRENCY` 控制并行房间数，其余排队；同一房间内部仍然串行。
+- 退化路径：工作区不是 git 仓库或无提交时不建 worktree，退回共享目录，需要把并发降到 1。
+
 ## 状态机
 
 ```
-created ──start──▶ running ──┬──▶ done            评审+核验+命令全通过
+created ──start──▶ queued ──▶ running ──┬──▶ done            评审+核验+命令全通过
                              ├──▶ needs_human     轮次用尽 / checklist 缺项 / 命令未过
                              ├──▶ paused ──start──▶ running
                              ├──▶ stopped         人工停止

@@ -6,9 +6,15 @@ const el = (tag, cls, text) => {
   return n
 }
 
+const store = {
+  tabs: [],
+  active: null,
+  rooms: [],
+}
 let current = null
 let source = null
 let roles = null
+let pollTimer = null
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -21,69 +27,147 @@ async function api(path, opts = {}) {
   return data
 }
 
+function saveTabs() {
+  sessionStorage.setItem('collab.tabs', JSON.stringify({ tabs: store.tabs, active: store.active }))
+}
+
+function loadTabs() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('collab.tabs') || '{}')
+    if (Array.isArray(saved.tabs)) store.tabs = saved.tabs
+    if (saved.active) store.active = saved.active
+  } catch {}
+}
+
 async function boot() {
   try {
     await api('/api/me')
-    showApp()
   } catch {
     $('#login').classList.remove('hidden')
+    return
   }
+  showApp()
 }
 
 function showApp() {
   $('#login').classList.add('hidden')
   $('#app').classList.remove('hidden')
+  loadTabs()
   refreshHealth()
   refreshRooms()
+  if (store.active && store.tabs.includes(store.active)) openRoom(store.active)
+  pollTimer = setInterval(poll, 3000)
 }
 
 async function refreshHealth() {
   const h = await api('/api/health').catch(() => null)
   const node = $('#health')
   if (!h) return (node.textContent = '服务异常')
-  const n = h.models?.length || 0
   node.textContent = h.ok
-    ? `${h.mock ? 'MOCK 模式' : 'LIVE'} · ${n} 个模型可用`
+    ? `${h.mock ? 'MOCK' : 'LIVE'} · ${h.models.length} 个模型 · 并发 ${h.concurrency ?? '-'}`
     : h.reason || 'opencode 不可用'
   node.style.color = h.ok ? 'var(--muted)' : 'var(--danger)'
 }
 
 async function refreshRooms() {
   const { rooms } = await api('/api/rooms')
+  store.rooms = rooms
+  renderSidebar()
+  renderTabs()
+}
+
+function renderSidebar() {
   const list = $('#room-list')
   list.textContent = ''
-  for (const r of rooms) {
-    const item = el('div', 'room-item' + (current?.id === r.id ? ' active' : ''))
+  for (const r of store.rooms) {
+    const item = el('div', 'room-item' + (store.active === r.id ? ' active' : ''))
     item.append(el('div', 'req', r.requirement))
     const sub = el('div', 'sub')
     sub.append(el('span', `badge ${r.status}`, statusText(r.status)))
     sub.append(el('span', '', `${r.round}/${r.maxRounds} 轮`))
     if (r.mock) sub.append(el('span', '', 'MOCK'))
-    item.append(sub)
-    item.onclick = () => selectRoom(r.id)
+    item.onclick = () => openRoom(r.id)
     list.append(item)
   }
 }
 
-function statusText(s) {
-  return { created: '待开始', running: '进行中', paused: '已暂停', done: '已完成', needs_human: '需人工', error: '出错', stopped: '已停止', interrupted: '中断' }[s] || s
+function renderTabs() {
+  const bar = $('#tabbar')
+  bar.textContent = ''
+  bar.classList.toggle('hidden', store.tabs.length === 0)
+  for (const id of store.tabs) {
+    const room = store.rooms.find((r) => r.id === id)
+    const tab = el('button', 'tab' + (store.active === id ? ' active' : ''))
+    tab.append(el('span', `dot ${room?.status || 'idle'}`))
+    tab.append(el('span', 'tab-title', room ? shortTitle(room.requirement) : id))
+    const x = el('span', 'tab-x', '×')
+    x.onclick = (e) => {
+      e.stopPropagation()
+      closeTab(id)
+    }
+    tab.append(x)
+    tab.onclick = () => openRoom(id)
+    bar.append(tab)
+  }
+  const add = el('button', 'tab tab-add', '+')
+  add.title = '新建需求'
+  add.onclick = openCreate
+  bar.append(add)
 }
 
-async function selectRoom(id) {
+function shortTitle(text) {
+  return String(text || '').replace(/\s+/g, ' ').slice(0, 16)
+}
+
+function closeTab(id) {
+  store.tabs = store.tabs.filter((t) => t !== id)
+  if (store.active === id) {
+    store.active = store.tabs[store.tabs.length - 1] || null
+    if (store.active) return openRoom(store.active)
+    current = null
+    if (source) source.close()
+    source = null
+    $('#room').classList.add('hidden')
+    $('#empty').classList.remove('hidden')
+  }
+  saveTabs()
+  renderTabs()
+  renderSidebar()
+}
+
+async function openRoom(id) {
+  if (!store.tabs.includes(id)) store.tabs.push(id)
+  store.active = id
+  saveTabs()
   const { room } = await api(`/api/rooms/${id}`)
-  current = room
+  current = normalize(room)
+  $('#empty').classList.add('hidden')
+  $('#room').classList.remove('hidden')
   renderRoom()
-  refreshRooms()
+  renderTabs()
+  renderSidebar()
   openStream(id)
+}
+
+function normalize(room) {
+  room.messages = room.messages || []
+  room.artifacts = room.artifacts || []
+  return room
+}
+
+function statusText(s) {
+  return { created: '待开始', queued: '排队中', running: '进行中', paused: '已暂停', done: '已完成', needs_human: '需人工', error: '出错', stopped: '已停止', interrupted: '中断' }[s] || s
 }
 
 function renderRoom() {
   const room = current
-  $('#empty').classList.add('hidden')
-  $('#room').classList.remove('hidden')
   $('#room-title').textContent = room.requirement.split('\n')[0].slice(0, 60)
   renderMeta()
-  $('#reason').textContent = room.reason ? `结束原因：${room.reason}` : ''
+  $('#reason').textContent = room.reason
+    ? `结束原因：${room.reason}`
+    : room.isolated
+      ? `独立工作区：${room.workspace}`
+      : `共享工作区${room.isolationReason ? `（${room.isolationReason}）` : ''}`
 
   const chat = $('#tab-chat')
   chat.textContent = ''
@@ -98,27 +182,30 @@ function renderRoom() {
   const sel = $('#inject-role')
   sel.textContent = ''
   for (const [key, role] of Object.entries(room.roles)) {
-    const o = el('option', '', `${role.label}`)
+    const o = el('option', '', role.label)
     o.value = key
     sel.append(o)
   }
 
-  const fl = $('#file-list')
-  fl.textContent = ''
-  for (const f of room.artifacts || []) {
-    const li = el('li', '', f)
-    li.onclick = () => viewFile(f)
-    fl.append(li)
-  }
-  if (!room.artifacts?.length) fl.append(el('li', 'muted', '暂无文件'))
+  renderFiles()
   loadBoard()
-  scrollChat()
 }
 
 function renderMeta() {
   const room = current
-  const rolesText = Object.entries(room.roles).map(([k, v]) => `${k}=${v.model}`).join('  ·  ')
+  const rolesText = Object.entries(room.roles).map(([k, v]) => `${k}=${v.model}`).join(' · ')
   $('#room-meta').textContent = `${statusText(room.status)} · ${room.round}/${room.maxRounds} 轮 · ${rolesText}`
+}
+
+function renderFiles() {
+  const fl = $('#file-list')
+  fl.textContent = ''
+  for (const f of current.artifacts) {
+    const li = el('li', '', f)
+    li.onclick = () => viewFile(f)
+    fl.append(li)
+  }
+  if (!current.artifacts.length) fl.append(el('li', 'muted', '暂无文件'))
 }
 
 function msgNode(m) {
@@ -136,7 +223,7 @@ function scrollChat() {
 
 function openStream(id) {
   if (source) source.close()
-  source = new EventSource(`/api/rooms/${id}/events`)
+  source = new EventSource(`/api/rooms/${encodeURIComponent(id)}/events`)
   source.onmessage = (e) => {
     const ev = JSON.parse(e.data)
     if (!current || current.id !== id) return
@@ -147,13 +234,14 @@ function openStream(id) {
 function handleEvent(ev) {
   if (ev.type === 'message') {
     const col = document.querySelector(`.chat .col[data-role="${ev.role}"]`)
-    if (col) {
-      col.querySelector('.thinking')?.remove()
-      const m = { role: ev.role, round: ev.round, kind: ev.kind, content: ev.content, at: ev.at }
-      current.messages.push(m)
-      col.append(msgNode(m))
-      scrollChat()
-      if (ev.kind !== 'human') loadBoard()
+    if (!col) return
+    col.querySelector('.thinking')?.remove()
+    const m = { role: ev.role, round: ev.round, kind: ev.kind, content: ev.content, at: ev.at }
+    current.messages.push(m)
+    col.append(msgNode(m))
+    scrollChat()
+    if (ev.kind !== 'human') {
+      loadBoard()
       refreshArtifacts()
     }
   }
@@ -174,10 +262,9 @@ function handleEvent(ev) {
   if (ev.type === 'round_start') {
     current.round = ev.round
     renderMeta()
-    refreshRooms()
   }
   if (ev.type === 'verdict') {
-    const bits = [`R${ev.round} 判定：评审 ${ev.reviewOk ? '通过' : '未通过'}`, `核验 ${ev.verifyOk ? '通过' : '未通过'}`, `命令 ${ev.commandsOk ? '通过' : '未通过'}`]
+    const bits = [`R${ev.round}：评审 ${ev.reviewOk ? '通过' : '未通过'}`, `核验 ${ev.verifyOk ? '通过' : '未通过'}`, `命令 ${ev.commandsOk ? '通过' : '未通过'}`]
     if (!ev.reviewOk && ev.missingChecklist?.length) bits.push(`缺项 ${ev.missingChecklist.join('/')}`)
     $('#reason').textContent = bits.join(' · ')
   }
@@ -194,18 +281,16 @@ function handleEvent(ev) {
 
 async function refreshArtifacts() {
   const { room } = await api(`/api/rooms/${current.id}`)
-  current.artifacts = room.artifacts
-  const fl = $('#file-list')
-  fl.textContent = ''
-  for (const f of room.artifacts) {
-    const li = el('li', '', f)
-    li.onclick = () => viewFile(f)
-    fl.append(li)
-  }
+  current.artifacts = room.artifacts || []
+  current.status = room.status
+  current.round = room.round
+  current.reason = room.reason
+  renderFiles()
+  renderMeta()
 }
 
 async function viewFile(path) {
-  const { content } = await api(`/api/rooms/${current.id}/file?path=${encodeURIComponent(path)}`)
+  const { content } = await api(`/api/rooms/${encodeURIComponent(current.id)}/file?path=${encodeURIComponent(path)}`)
   $('#file-view').textContent = content
   $('#file-view').classList.remove('muted')
   for (const li of document.querySelectorAll('#file-list li')) li.classList.toggle('active', li.textContent === path)
@@ -213,9 +298,33 @@ async function viewFile(path) {
 
 async function loadBoard() {
   try {
-    const { content } = await api(`/api/rooms/${current.id}/file?path=board.md`)
+    const { content } = await api(`/api/rooms/${encodeURIComponent(current.id)}/file?path=board.md`)
     $('#board').textContent = content
   } catch {}
+}
+
+async function poll() {
+  if (document.hidden) return
+  await refreshRooms().catch(() => {})
+  if (!current) return
+  const latest = store.rooms.find((r) => r.id === current.id)
+  if (!latest) return
+  if (latest.status !== current.status || latest.round !== current.round) {
+    const { room } = await api(`/api/rooms/${current.id}`)
+    current = normalize(room)
+    renderRoom()
+  }
+}
+
+async function openCreate() {
+  $('#modal').classList.remove('hidden')
+  $('#create-error').textContent = ''
+  if (!roles) {
+    roles = (await api('/api/roles')).roles
+    const box = $('#role-preview')
+    box.textContent = ''
+    for (const [k, v] of Object.entries(roles)) box.append(el('div', '', `${v.label}: ${v.model} → agent=${v.agent}`))
+  }
 }
 
 $('#login-form').onsubmit = async (e) => {
@@ -231,20 +340,11 @@ $('#login-form').onsubmit = async (e) => {
 
 $('#logout').onclick = async () => {
   await api('/api/logout', { method: 'POST' })
+  sessionStorage.removeItem('collab.tabs')
   location.reload()
 }
 
-$('#new-room').onclick = async () => {
-  $('#modal').classList.remove('hidden')
-  $('#create-error').textContent = ''
-  if (!roles) {
-    roles = (await api('/api/roles')).roles
-    const box = $('#role-preview')
-    box.textContent = ''
-    for (const [k, v] of Object.entries(roles)) box.append(el('div', '', `${v.label}: ${v.model} → agent=${v.agent}`))
-  }
-}
-
+$('#new-room').onclick = openCreate
 $('#cancel-create').onclick = () => $('#modal').classList.add('hidden')
 
 $('#create-form').onsubmit = async (e) => {
@@ -258,24 +358,23 @@ $('#create-form').onsubmit = async (e) => {
   try {
     const { room } = await api('/api/rooms', { method: 'POST', body: JSON.stringify(payload) })
     $('#modal').classList.add('hidden')
+    $('#create-form').reset()
+    $('#f-rounds').value = 3
     await refreshRooms()
-    await selectRoom(room.id)
-    await api(`/api/rooms/${room.id}/start`, { method: 'POST' })
+    await openRoom(room.id)
+    await api(`/api/rooms/${encodeURIComponent(room.id)}/start`, { method: 'POST' })
+    await refreshRooms()
   } catch (err) {
     $('#create-error').textContent = err.message
   }
 }
 
 $('#btn-start').onclick = async () => {
-  await api(`/api/rooms/${current.id}/start`, { method: 'POST' })
-  refreshRooms()
+  await api(`/api/rooms/${encodeURIComponent(current.id)}/start`, { method: 'POST' })
+  await refreshRooms()
 }
-$('#btn-pause').onclick = async () => {
-  await api(`/api/rooms/${current.id}/pause`, { method: 'POST' })
-}
-$('#btn-stop').onclick = async () => {
-  await api(`/api/rooms/${current.id}/stop`, { method: 'POST' })
-}
+$('#btn-pause').onclick = () => api(`/api/rooms/${encodeURIComponent(current.id)}/pause`, { method: 'POST' }).then(refreshRooms)
+$('#btn-stop').onclick = () => api(`/api/rooms/${encodeURIComponent(current.id)}/stop`, { method: 'POST' }).then(refreshRooms)
 
 $('#inject-send').onclick = async () => {
   const text = $('#inject-text').value.trim()
@@ -283,7 +382,7 @@ $('#inject-send').onclick = async () => {
   const role = $('#inject-role').value
   $('#inject-text').value = ''
   try {
-    await api(`/api/rooms/${current.id}/inject`, { method: 'POST', body: JSON.stringify({ role, text }) })
+    await api(`/api/rooms/${encodeURIComponent(current.id)}/inject`, { method: 'POST', body: JSON.stringify({ role, text }) })
   } catch (err) {
     $('#reason').textContent = `插话失败：${err.message}`
   }
@@ -292,12 +391,14 @@ $('#inject-send').onclick = async () => {
 for (const btn of document.querySelectorAll('.tabs button')) {
   btn.onclick = () => {
     for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('active', b === btn)
-    for (const id of ['chat', 'board', 'files']) {
-      $(`#tab-${id}`).classList.toggle('hidden', id !== btn.dataset.tab)
-    }
+    for (const id of ['chat', 'board', 'files']) $(`#tab-${id}`).classList.toggle('hidden', id !== btn.dataset.tab)
     if (btn.dataset.tab === 'board') loadBoard()
     if (btn.dataset.tab === 'files') refreshArtifacts()
   }
 }
+
+window.addEventListener('visibilitychange', () => {
+  if (!document.hidden) poll()
+})
 
 boot()

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "architect": {
+      "description": "主设计与主实现：出方案、写代码、逐条回应评审意见",
+      "model": "cannbot/deepseek-v4-pro",
+      "prompt": "{file:./prompts/architect.md}",
+      "permission": {
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "git status": "allow",
+          "git diff*": "allow",
+          "git log*": "allow"
+        }
+      }
+    },
+    "reviewer": {
+      "description": "独立评审：只读，按 checklist 出 BLOCKER/MAJOR/MINOR",
+      "model": "cannbot/glm-5.3",
+      "prompt": "{file:./prompts/reviewer.md}",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "patch": false
+      }
+    },
+    "verifier": {
+      "description": "核验：逐条判定 issue 是否修复并跑验收命令，只认证据",
+      "model": "cannbot/deepseek-v4.1-flash",
+      "prompt": "{file:./prompts/verifier.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "git status": "allow",
+          "git diff*": "allow",
+          "pytest*": "allow",
+          "npm test*": "allow",
+          "npm run lint*": "allow",
+          "npm run build*": "allow",
+          "go test*": "allow",
+          "cargo test*": "allow"
+        }
+      }
+    }
+  }
+}

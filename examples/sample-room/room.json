@@ -1,0 +1,98 @@
+{
+  "id": "20261101-103031-给配置模块增加校验-非法输入返回-einval-并补一条超时用例",
+  "requirement": "给配置模块增加校验：非法输入返回 EINVAL，并补一条超时用例",
+  "doneWhen": [
+    "node -e \"process.exit(0)\""
+  ],
+  "maxRounds": 3,
+  "round": 2,
+  "status": "done",
+  "control": "run",
+  "mock": true,
+  "createdAt": "2026-11-01T02:30:31.187Z",
+  "updatedAt": "2026-11-01T02:30:32.165Z",
+  "roles": {
+    "architect": {
+      "label": "Architect",
+      "model": "cannbot/deepseek-v4-pro",
+      "agent": "architect",
+      "sessionID": "mock-ses-1-architect-ei"
+    },
+    "reviewer": {
+      "label": "Reviewer",
+      "model": "cannbot/glm-5.3",
+      "agent": "reviewer",
+      "sessionID": "mock-ses-2-reviewer-ein"
+    },
+    "verifier": {
+      "label": "Verifier",
+      "model": "cannbot/deepseek-v4.1-flash",
+      "agent": "verifier",
+      "sessionID": "mock-ses-3-verifier-ein"
+    }
+  },
+  "artifacts": [
+    "round-1/proposal-architect.md",
+    "round-1/review-reviewer.md",
+    "round-1/verify-verifier.md",
+    "round-1/commands.log",
+    "round-2/proposal-architect.md",
+    "round-2/review-reviewer.md",
+    "round-2/verify-verifier.md",
+    "round-2/commands.log",
+    "DECISION.md",
+    "REPORT.md"
+  ],
+  "messages": [
+    {
+      "at": "2026-11-01T02:30:31.343Z",
+      "role": "architect",
+      "label": "Architect",
+      "kind": "proposal",
+      "round": 1,
+      "content": "# 方案（第 1 轮，MOCK）\n\n## 目标拆解\n1. 定义模块边界与接口\n2. 实现核心逻辑\n3. 补充测试\n\n## 改动文件\n- `src/core/index.ts` 新增\n- `src/core/types.ts` 新增\n- `test/core.test.ts` 新增\n\n## 关键决策\n- 采用显式错误码而非抛异常，便于上层收敛\n- 并发路径统一走单写者队列，避免竞态\n\n## 风险\n- 大输入下的内存峰值未验证\n\n## 回应\n- RV-1: REJECTED（本轮尚未处理）\n"
+    },
+    {
+      "at": "2026-11-01T02:30:31.474Z",
+      "role": "reviewer",
+      "label": "Reviewer",
+      "kind": "review",
+      "round": 1,
+      "content": "# 独立评审（第 1 轮，MOCK）\n\n## CHECKLIST\n- 需求覆盖: FAIL 未覆盖空输入与超时\n- 接口契约: FAIL 未覆盖空输入与超时\n- 异常路径: OK\n- 并发与资源: FAIL 未覆盖空输入与超时\n- 安全: FAIL 未覆盖空输入与超时\n- 测试充分性: FAIL 未覆盖空输入与超时\n\n## ISSUES\n- [MAJOR] RV-1 src/core/index.ts:42 | 输入为空时未判空，会向下游传 undefined | 增加判空并返回 EINVAL\n- [MINOR] RV-2 test/core.test.ts:12 | 缺少超时用例 | 补一条超时路径用例\n"
+    },
+    {
+      "at": "2026-11-01T02:30:31.602Z",
+      "role": "verifier",
+      "label": "Verifier",
+      "kind": "verify",
+      "round": 1,
+      "content": "# 核验（第 1 轮，MOCK）\n\n## ISSUE 核验\n- RV-1: NOT_FIXED 证据 src/core/index.ts:42 仍无判空\n- RV-2: UNVERIFIABLE 用例尚未添加\n\n## 命令\n- npm test -> exit 1\n"
+    },
+    {
+      "at": "2026-11-01T02:30:31.818Z",
+      "role": "architect",
+      "label": "Architect",
+      "kind": "proposal",
+      "round": 2,
+      "content": "# 方案（第 2 轮，MOCK）\n\n## 目标拆解\n1. 定义模块边界与接口\n2. 实现核心逻辑\n3. 补充测试\n\n## 改动文件\n- `src/core/index.ts` 新增\n- `src/core/types.ts` 新增\n- `test/core.test.ts` 新增\n\n## 关键决策\n- 采用显式错误码而非抛异常，便于上层收敛\n- 并发路径统一走单写者队列，避免竞态\n\n## 风险\n- 大输入下的内存峰值未验证\n\n## 回应\n- RV-1: FIXED 已在 src/core/index.ts:38 增加空值判断与错误码\n"
+    },
+    {
+      "at": "2026-11-01T02:30:31.950Z",
+      "role": "reviewer",
+      "label": "Reviewer",
+      "kind": "review",
+      "round": 2,
+      "content": "# 独立评审（第 2 轮，MOCK）\n\n## CHECKLIST\n- 需求覆盖: OK\n- 接口契约: OK\n- 异常路径: OK\n- 并发与资源: OK\n- 安全: OK\n- 测试充分性: OK\n\n## ISSUES\n- 无\n"
+    },
+    {
+      "at": "2026-11-01T02:30:32.081Z",
+      "role": "verifier",
+      "label": "Verifier",
+      "kind": "verify",
+      "round": 2,
+      "content": "# 核验（第 2 轮，MOCK）\n\n## ISSUE 核验\n- RV-1: FIXED 证据 src/core/index.ts:38 增加 if (!input) return EINVAL\n- RV-2: FIXED 证据 test/core.test.ts:30 新增超时用例\n\n## 命令\n- npm test -> exit 0\n"
+    }
+  ],
+  "reason": "评审通过 + 核验通过 + 验收命令通过",
+  "finishedAt": "2026-11-01T02:30:32.145Z"
+}

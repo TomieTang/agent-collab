@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent Collab</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div id="login" class="login hidden">
+  <form id="login-form">
+    <h1>Agent Collab</h1>
+    <p class="muted">多模型协作 · 本地归档</p>
+    <input id="password" type="password" placeholder="访问密码" autocomplete="current-password" required />
+    <button type="submit">进入</button>
+    <div id="login-error" class="error"></div>
+  </form>
+</div>
+
+<div id="app" class="app hidden">
+  <header>
+    <div class="brand">Agent Collab</div>
+    <div id="health" class="health"></div>
+    <button id="logout" class="link">退出</button>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <button id="new-room" class="primary">+ 新需求</button>
+      <div id="room-list" class="room-list"></div>
+    </aside>
+
+    <main>
+      <section id="empty" class="empty">
+        <p>选择左侧需求，或新建一个。</p>
+        <p class="muted">流程：Architect 提案 → Reviewer 独立评审 → Verifier 核验 → 命令验收 → 归档</p>
+      </section>
+
+      <section id="room" class="room hidden">
+        <div class="room-head">
+          <div>
+            <h2 id="room-title"></h2>
+            <div id="room-meta" class="meta"></div>
+          </div>
+          <div class="controls">
+            <button id="btn-start" class="primary">开始</button>
+            <button id="btn-pause">暂停</button>
+            <button id="btn-stop" class="danger">停止</button>
+          </div>
+        </div>
+        <div id="reason" class="reason"></div>
+
+        <nav class="tabs">
+          <button data-tab="chat" class="active">对话</button>
+          <button data-tab="board">Board</button>
+          <button data-tab="files">归档文件</button>
+        </nav>
+
+        <div id="tab-chat" class="tab-panel chat"></div>
+        <div id="tab-board" class="tab-panel hidden"><pre id="board"></pre></div>
+        <div id="tab-files" class="tab-panel hidden">
+          <div class="files">
+            <ul id="file-list"></ul>
+            <pre id="file-view" class="muted">选择左侧文件查看</pre>
+          </div>
+        </div>
+
+        <div class="inject">
+          <select id="inject-role"></select>
+          <input id="inject-text" placeholder="以人的身份插话（可选）" />
+          <button id="inject-send">发送</button>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="modal" class="modal hidden">
+  <form id="create-form" class="modal-box">
+    <h3>新建需求</h3>
+    <label>需求描述<textarea id="f-requirement" rows="5" required placeholder="要设计/开发/完善什么？"></textarea></label>
+    <label>验收命令（每行一条，必须全部 exit 0）<textarea id="f-done" rows="3" placeholder="npm test"></textarea></label>
+    <label>最大轮次<input id="f-rounds" type="number" value="3" min="1" max="8" /></label>
+    <div id="role-preview" class="role-preview"></div>
+    <div class="modal-actions">
+      <button type="button" id="cancel-create">取消</button>
+      <button type="submit" class="primary">创建</button>
+    </div>
+    <div id="create-error" class="error"></div>
+  </form>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

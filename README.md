@@ -54,9 +54,18 @@ cloudflared tunnel --url http://127.0.0.1:3000
 
 ## 配置
 
+把以下内容存成项目根目录的 `.env`，`npm start` 会自动加载（已存在的环境变量优先）：
+
+```bash
+COLLAB_PASSWORD=dev123
+OC_PASS=dev123
+COLLAB_WORKSPACE=/path/to/your/repo
+```
+
+
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `COLLAB_PASSWORD` | 空（必填） | 登录密码；不设且未开 `COLLAB_ALLOW_NOAUTH=1` 时拒绝启动 |
+| `COLLAB_PASSWORD` | 空（必填） | 网页登录密码，自定义即可，无需注册；不设且未开 `COLLAB_ALLOW_NOAUTH=1` 时拒绝启动 |
 | `COLLAB_SECRET` | 同密码 | Cookie 签名密钥 |
 | `COLLAB_PORT` / `COLLAB_HOST` | 3000 / 127.0.0.1 | 监听地址 |
 | `COLLAB_WORKSPACE` | `./workspace` | agent 实际改代码的仓库 |

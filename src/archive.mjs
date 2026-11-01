@@ -35,7 +35,7 @@ export class Archive {
     await fs.mkdir(this.roomDir(room.id), { recursive: true })
     await fs.writeFile(
       path.join(this.roomDir(room.id), 'board.md'),
-      `# Board — ${room.requirement.slice(0, 80)}\n\n## 目标\n${room.requirement}\n\n## 已确认结论\n\n## 待决问题\n| ID | 提出方 | 严重度 | 状态 |\n| --- | --- | --- | --- |\n\n## 下一步\n`,
+      `# Board — ${(room.task || '').slice(0, 80)}\n\n## 任务类型\n${room.mode || 'build'}\n\n## 目标\n${room.task}\n\n## 已确认结论\n\n## 待决问题\n| ID | 提出方 | 严重度 | 状态 |\n| --- | --- | --- | --- |\n\n## 下一步\n`,
       'utf8'
     )
     await this.saveRoom(room)
@@ -63,7 +63,8 @@ export class Archive {
         const room = JSON.parse(await fs.readFile(file, 'utf8'))
         rooms.push({
           id: room.id,
-          requirement: room.requirement,
+          task: room.task || room.requirement,
+          mode: room.mode || 'build',
           status: room.status,
           round: room.round,
           maxRounds: room.maxRounds,
@@ -135,6 +136,7 @@ export class Archive {
     const proposal = (await this.readArtifact(room, `round-${round}/proposal-architect.md`)) || ''
     const content = `# DECISION — ${room.id}
 
+- 任务类型：${room.mode || 'build'}
 - 状态：${verdict}
 - 轮次：${round}/${room.maxRounds}
 - 模型：architect=${room.roles.architect.model} / reviewer=${room.roles.reviewer.model} / verifier=${room.roles.verifier.model}
@@ -154,9 +156,9 @@ ${unresolved.length ? unresolved.map((u) => `- ${u}`).join('\n') : '- 无'}
     const files = await this.listFiles(room)
     const content = `# REPORT — ${room.id}
 
-## 需求
+## 任务（${room.mode || 'build'}）
 
-${room.requirement}
+${room.task || room.requirement}
 
 ## 结果
 

@@ -8,6 +8,7 @@ import { OpencodeClient } from './src/oc.mjs'
 import { MockOpencodeClient } from './src/mock-oc.mjs'
 import { runRoom } from './src/orchestrator.mjs'
 import { prepareWorkspace } from './src/workspace.mjs'
+import { MODES, modeList } from './src/modes.mjs'
 
 const auth = makeAuth(config.secret)
 const archive = new Archive(config.archiveDir)
@@ -89,23 +90,34 @@ async function ensureRoom(id) {
   return room
 }
 
+function badRequest(message) {
+  const e = new Error(message)
+  e.status = 400
+  return e
+}
+
 async function createRoom(payload) {
-  const requirement = String(payload.requirement || '').trim()
-  if (!requirement) throw new Error('需求不能为空')
+  const task = String(payload.task || payload.requirement || '').trim()
+  if (!task) throw badRequest('任务描述不能为空')
+  const mode = MODES[payload.mode] ? payload.mode : 'build'
+  if (MODES[mode].requireCommands && !(Array.isArray(payload.doneWhen) && payload.doneWhen.length)) {
+    throw badRequest(`${MODES[mode].label}必须至少设置一条验收命令`)
+  }
   const maxRounds = Math.min(Math.max(Number(payload.maxRounds || config.maxRounds), 1), 8)
   const doneWhen = (Array.isArray(payload.doneWhen) ? payload.doneWhen : [])
     .map((s) => String(s).trim())
     .filter(Boolean)
-  const id = archive.newId(requirement)
+  const id = archive.newId(task)
   const ws = await prepareWorkspace(config.workspace, id)
   const roles = {}
   for (const [key, def] of Object.entries(config.roles)) {
-    const sessionID = await oc.createSession(`${key} · ${slugify(requirement, 24)}`)
-    roles[key] = { ...def, sessionID }
+    const sessionID = await oc.createSession(`${key} · ${slugify(task, 24)}`)
+    roles[key] = { ...def, label: MODES[mode].roles[key] || def.label, sessionID }
   }
   const room = {
     id,
-    requirement,
+    task,
+    mode,
     doneWhen,
     maxRounds,
     round: 0,
@@ -212,6 +224,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/me') return json(res, 200, { ok: true })
 
     if (p === '/api/roles') return json(res, 200, { roles: config.roles })
+
+    if (p === '/api/modes') return json(res, 200, { modes: modeList() })
 
     if (p === '/api/models') {
       const h = await oc.health()

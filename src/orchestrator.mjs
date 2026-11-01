@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { proposalPrompt, reviewPrompt, verifyPrompt, checklistCoverage, extractIssues } from './prompts.mjs'
+import { modeOf } from './modes.mjs'
 
 class StopSignal extends Error {}
 
@@ -72,7 +73,9 @@ async function step(ctx, room, roleKey, kind, promptText) {
 }
 
 async function runDoneWhen(ctx, room) {
-  if (!room.doneWhen.length) return { ok: false, log: '', reason: '未设置验收命令' }
+  if (!room.doneWhen.length) {
+    return { ok: !modeOf(room).requireCommands, log: '', reason: '' }
+  }
   const lines = []
   let ok = true
   for (const cmd of room.doneWhen) {
@@ -138,35 +141,38 @@ export async function runRoom(ctx, room) {
       await gate(ctx, room)
       lastVerify = await step(ctx, room, 'verifier', 'verify', verifyPrompt(room, round, room.doneWhen))
 
-      const coverage = checklistCoverage(lastReview)
-      const hasBlocking = /\[(BLOCKER|MAJOR)\]/i.test(lastReview)
-      const verifyFailed = /NOT_FIXED|UNVERIFIABLE/i.test(lastVerify)
+      const mode = modeOf(room)
+      const coverage = checklistCoverage(mode, lastReview)
       const cmd = await runDoneWhen(ctx, room)
       lastLog = cmd.log
       unresolved = extractIssues(lastReview)
+      const verdict = mode.converge({
+        review: lastReview,
+        verify: lastVerify,
+        coverage,
+        commandsOk: cmd.ok,
+        doneWhen: room.doneWhen,
+      })
 
-      const reviewOk = coverage.complete && !hasBlocking
       ctx.emit(room, {
         type: 'verdict',
         round,
-        reviewOk,
-        verifyOk: !verifyFailed,
+        ok: verdict.ok,
+        reviewOk: coverage.complete && !/\[(BLOCKER|MAJOR)\]/i.test(lastReview),
+        verifyOk: !/UNVERIFIABLE|NOT_FIXED/i.test(lastVerify),
         commandsOk: cmd.ok,
         missingChecklist: coverage.missing,
+        reason: verdict.reason,
       })
 
-      if (reviewOk && !verifyFailed && cmd.ok) {
+      if (verdict.ok) {
         room.status = 'done'
-        room.reason = '评审通过 + 核验通过 + 验收命令通过'
+        room.reason = verdict.reason
         break
       }
       if (round === room.maxRounds) {
         room.status = 'needs_human'
-        room.reason = !cmd.ok
-          ? '达到轮次上限，验收命令未通过'
-          : !coverage.complete
-            ? `达到轮次上限，评审 checklist 缺项：${coverage.missing.join('/')}`
-            : '达到轮次上限，仍有 BLOCKER/MAJOR 或未修复项'
+        room.reason = `达到轮次上限：${verdict.reason || cmd.reason || '未收敛'}`
       }
     }
     if (room.status === 'running') {

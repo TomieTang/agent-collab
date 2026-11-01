@@ -5,7 +5,7 @@
     "model": "cannbot/deepseek-v4-pro",
     "agent": "architect",
     "round": 2,
-    "ms": 124,
+    "ms": 123,
     "tokens": null
   },
   {
@@ -14,7 +14,7 @@
     "model": "cannbot/glm-5.3",
     "agent": "reviewer",
     "round": 2,
-    "ms": 123,
+    "ms": 125,
     "tokens": null
   },
   {
@@ -23,7 +23,7 @@
     "model": "cannbot/deepseek-v4.1-flash",
     "agent": "verifier",
     "round": 2,
-    "ms": 124,
+    "ms": 125,
     "tokens": null
   },
   {
@@ -32,7 +32,7 @@
     "model": "cannbot/deepseek-v4-pro",
     "agent": "architect",
     "round": 2,
-    "ms": 123,
+    "ms": 121,
     "tokens": null
   },
   {
@@ -41,7 +41,7 @@
     "model": "cannbot/glm-5.3",
     "agent": "reviewer",
     "round": 2,
-    "ms": 122,
+    "ms": 121,
     "tokens": null
   },
   {
@@ -50,7 +50,7 @@
     "model": "cannbot/deepseek-v4.1-flash",
     "agent": "verifier",
     "round": 2,
-    "ms": 122,
+    "ms": 121,
     "tokens": null
   }
 ]

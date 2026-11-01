@@ -7,15 +7,13 @@
 
 ## 改动文件
 - `src/core/index.ts` 新增
-- `src/core/types.ts` 新增
 - `test/core.test.ts` 新增
 
 ## 关键决策
 - 采用显式错误码而非抛异常，便于上层收敛
-- 并发路径统一走单写者队列，避免竞态
 
 ## 风险
 - 大输入下的内存峰值未验证
 
 ## 回应
-- RV-1: FIXED 已在 src/core/index.ts:38 增加空值判断与错误码
+- RV-1: FIXED 已在 src/core/index.ts:38 增加判空与错误码

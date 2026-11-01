@@ -1,6 +1,6 @@
 # Agent Collab
 
-多模型 Agent 协作平台：给一个需求，由不同模型分别担任 **Architect（设计与实现）/ Reviewer（独立评审）/ Verifier（核验）**，按回合互相检视，直到评审、核验和验收命令全部通过；全过程落在 `requirements/<需求目录>/` 里归档。
+多模型 Agent 协作平台：给一个任务（开发、定位问题、分析评估、评审实现），由不同模型分别担任 **Architect（设计与实现）/ Reviewer（独立评审）/ Verifier（核验）**，按回合互相检视，直到评审、核验和验收命令全部通过；全过程落在 `requirements/<需求目录>/` 里归档。
 
 底层复用 [opencode](https://opencode.ai) 的 headless server，不自研 agent 循环。
 
@@ -98,9 +98,9 @@ REPORT.md              结果、分工、变更文件、证据
 
 运行期会在工作区创建 `.collab` 软链指向当前房间目录，让 agent 用 `.collab/round-N/...` 读写产物；房间结束后自动移除。
 
-## 多需求并行与隔离
+## 多任务并行与隔离
 
-网页顶部是页签栏，一个页签 = 一个需求 = 一个房间：
+网页顶部是页签栏，一个页签 = 一个任务 = 一个房间：
 
 - 每个房间单独创建 3 个 session，模型上下文互不可见
 - 归档写入各自的 `requirements/<id>/`，互不覆盖
@@ -110,17 +110,29 @@ REPORT.md              结果、分工、变更文件、证据
 
 `COLLAB_CONCURRENCY`（默认 2）限制同时运行的房间数，其余显示「排队中」。工作区不是 git 仓库或还没有提交时无法建 worktree，会退回共享目录，此时请把并发设为 1。
 
-## 收敛规则
+## 任务类型
 
-一轮 = Architect 提案 → Reviewer 独立评审 → Verifier 逐条核验 → 编排器跑验收命令。
+新建任务时选择，三种角色的提示词、checklist 和收敛判据都随之切换：
 
-判定为 `done` 需要同时满足：
+| 类型 | 角色 | checklist | 判 `done` 的条件 | 验收命令 |
+| --- | --- | --- | --- | --- |
+| `build` 开发/实现 | Builder / Reviewer / Verifier | 需求覆盖、接口契约、异常路径、并发与资源、安全、测试充分性 | 无 BLOCKER/MAJOR + 无 NOT_FIXED/UNVERIFIABLE + 命令全 exit 0 | **必填** |
+| `diagnose` 定位问题 | 排查 / 反证 / 取证 | 现象复现、假设可证伪、证据充分、其他可能、结论可操作 | 反证无 BLOCKER + 无 UNVERIFIABLE + 取证出现 `[CONFIRMED]` | 可选 |
+| `analyze` 分析/评估 | 分析 / 质询 / 核对 | 问题覆盖、依据充分、反例考虑、结论边界、建议可执行 | 无 BLOCKER/MAJOR + 依据无 `MISSING`/`WRONG` | 可选 |
+| `review` 评审实现 | 说明 / 评审 / 核对 | 范围明确、接口契约、异常路径、并发与资源、安全、可维护性 | 无 BLOCKER/MAJOR + 无 UNVERIFIABLE | 可选 |
 
-1. Reviewer 的 6 项 checklist 全部出现且无 `[BLOCKER]` / `[MAJOR]`（缺项视为未评审）
-2. Verifier 无 `NOT_FIXED` / `UNVERIFIABLE`
-3. 房间设置的验收命令全部 `exit 0`
+共同前置：checklist 必须完整出现，缺项视为未评审，不会收敛。任何一条不满足就进入下一轮；到上限仍是 `needs_human`，未解决项写进 `DECISION.md`。
 
-任何一条不满足就进入下一轮；到上限仍是 `needs_human`，未解决项写进 `DECISION.md`。**没设验收命令的房间不会被判为 done。**
+定位类任务靠标记判定而不是靠模型自述：
+
+```
+- [CONFIRMED] H1 src/data/loader.py:88 read() 无超时，hang 栈一致
+- [REFUTED]   H2 src/train.py:140 barrier 配对完整
+- [UNVERIFIABLE] H3 尚无栈采样
+- 结论：[CONFIRMED] ...
+```
+
+只要还有 `UNVERIFIABLE` 或缺少 `[CONFIRMED]`，这轮就不算通过。
 
 ## 角色分工依据
 
@@ -154,5 +166,6 @@ requirements/        需求归档
 - 单人使用，单密码鉴权，无多租户。
 - 轮次与命令超时兜底，但没有 token 预算硬限制。
 - 同一房间内串行执行各角色，不同房间可并行（依赖 worktree 隔离）。
+- 定位/分析类任务不改代码时，worktree 里可能是空的，属正常。
 - 并行房间共用 CANNBOT 网关配额，同一账号并发放太多会互相拖慢。
 - CANNBOT 的 JWT 过期后 `/provider` 只剩 `cannbot-error`，`/api/health` 会提示重新登录。

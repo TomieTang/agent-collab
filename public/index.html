@@ -26,7 +26,7 @@
 
   <div class="layout">
     <aside>
-      <button id="new-room" class="primary">+ 新需求</button>
+      <button id="new-room" class="primary">+ 新任务</button>
       <div id="room-list" class="room-list"></div>
     </aside>
 
@@ -78,9 +78,11 @@
 
 <div id="modal" class="modal hidden">
   <form id="create-form" class="modal-box">
-    <h3>新建需求</h3>
-    <label>需求描述<textarea id="f-requirement" rows="5" required placeholder="要设计/开发/完善什么？"></textarea></label>
-    <label>验收命令（每行一条，必须全部 exit 0）<textarea id="f-done" rows="3" placeholder="npm test"></textarea></label>
+    <h3>新建任务</h3>
+    <label>任务类型<select id="f-mode"></select></label>
+    <div id="mode-hint" class="muted"></div>
+    <label>任务描述<textarea id="f-task" rows="5" required placeholder="要做什么？"></textarea></label>
+    <label>验收命令（每行一条，必须全部 exit 0；开发类必填）<textarea id="f-done" rows="3" placeholder="npm test"></textarea></label>
     <label>最大轮次<input id="f-rounds" type="number" value="3" min="1" max="8" /></label>
     <div id="role-preview" class="role-preview"></div>
     <div class="modal-actions">

@@ -5,7 +5,7 @@
     "model": "cannbot/deepseek-v4-pro",
     "agent": "architect",
     "round": 1,
-    "ms": 126,
+    "ms": 125,
     "tokens": null
   },
   {
@@ -14,7 +14,7 @@
     "model": "cannbot/glm-5.3",
     "agent": "reviewer",
     "round": 1,
-    "ms": 124,
+    "ms": 125,
     "tokens": null
   },
   {
@@ -50,7 +50,7 @@
     "model": "cannbot/deepseek-v4.1-flash",
     "agent": "verifier",
     "round": 1,
-    "ms": 122,
+    "ms": 123,
     "tokens": null
   }
 ]

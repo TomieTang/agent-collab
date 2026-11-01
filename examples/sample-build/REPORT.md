@@ -1,6 +1,6 @@
-# REPORT — 20261101-104235-给配置模块增加校验-非法输入返回-einval-并补一条超时用例
+# REPORT — 20261101-104459-给配置模块增加校验-非法输入返回-einval-并补一条超时用例
 
-## 需求
+## 任务（build）
 
 给配置模块增加校验：非法输入返回 EINVAL，并补一条超时用例
 
@@ -8,16 +8,16 @@
 
 - 状态：`done`
 - 轮次：2/3
-- 结束时间：2026-11-01T02:42:37.350Z
+- 结束时间：2026-11-01T02:45:01.954Z
 - 原因：评审通过 + 核验通过 + 验收命令通过
 
 ## 分工
 
 | 角色 | 模型 | opencode agent | session |
 | --- | --- | --- | --- |
-| architect | `cannbot/deepseek-v4-pro` | `architect` | `mock-ses-1-architect-ei` |
-| reviewer | `cannbot/glm-5.3` | `reviewer` | `mock-ses-2-reviewer-ein` |
-| verifier | `cannbot/deepseek-v4.1-flash` | `verifier` | `mock-ses-3-verifier-ein` |
+| architect | `cannbot/deepseek-v4-pro` | `architect` | `mock-ses-1-architectein` |
+| reviewer | `cannbot/glm-5.3` | `reviewer` | `mock-ses-2-reviewereinv` |
+| verifier | `cannbot/deepseek-v4.1-flash` | `verifier` | `mock-ses-3-verifiereinv` |
 
 ## 验收命令
 

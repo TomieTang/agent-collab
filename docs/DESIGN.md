@@ -15,6 +15,19 @@
 | 前端 | 原生 JS + SSE | 零依赖，单文件可读，手机上够用 |
 | 归档位置 | 平台仓库 `requirements/` | 需求过程与代码仓库分离，归档可随平台仓一起备份 |
 
+## 任务类型与判据
+
+`src/modes.mjs` 把「类型」抽象成数据：角色名、checklist、三段提示词规格、收敛函数。
+
+| 类型 | 收敛核心 |
+| --- | --- |
+| build | checklist 完整 + 无 BLOCKER/MAJOR + 无 NOT_FIXED/UNVERIFIABLE + 验收命令 exit 0 |
+| diagnose | 假设驱动，取证必须出现 `[CONFIRMED]` 且无 `UNVERIFIABLE` |
+| analyze | 论证核对，依据不得为 `MISSING`/`WRONG` |
+| review | 对现有实现评审，结论不得 `UNVERIFIABLE` |
+
+新增类型只需在 `MODES` 里加一项，不改编排逻辑。
+
 ## 数据流
 
 ```

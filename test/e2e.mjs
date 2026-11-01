@@ -84,7 +84,8 @@ try {
   const { room } = await api('/api/rooms', {
     method: 'POST',
     body: JSON.stringify({
-      requirement: '给配置模块增加校验：非法输入返回 EINVAL，并补一条超时用例',
+      task: '给配置模块增加校验：非法输入返回 EINVAL，并补一条超时用例',
+      mode: 'build',
       doneWhen: ['node -e "process.exit(0)"'],
       maxRounds: 3,
     }),
@@ -131,7 +132,7 @@ try {
   const req2 = '再补一个并发用例：同一需求跑两次不互相覆盖'
   const { room: room2 } = await api('/api/rooms', {
     method: 'POST',
-    body: JSON.stringify({ requirement: req2, doneWhen: ['node -e "process.exit(0)"'], maxRounds: 2 }),
+    body: JSON.stringify({ task: req2, mode: 'build', doneWhen: ['node -e "process.exit(0)"'], maxRounds: 2 }),
   })
   assert.notEqual(room2.roles.architect.sessionID, room.roles.architect.sessionID)
   assert.notEqual(room2.workspace, room.workspace)
@@ -151,9 +152,41 @@ try {
   assert.equal(room2.isolated, true)
   assert.ok((await fs.stat(path.join(env.COLLAB_WORKSPACE, '.worktrees', room2.id)).catch(() => null))?.isDirectory())
 
+  const noCmd = await fetch(BASE + '/api/rooms', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ task: '没有验收命令的开发任务', mode: 'build' }),
+  })
+  assert.equal(noCmd.status, 400)
+
+  const { room: diag } = await api('/api/rooms', {
+    method: 'POST',
+    body: JSON.stringify({
+      task: '训练脚本偶发 hang，日志在 logs/train.log，定位根因',
+      mode: 'diagnose',
+      maxRounds: 2,
+    }),
+  })
+  await api(`/api/rooms/${encodeURIComponent(diag.id)}/start`, { method: 'POST' })
+  let d = null
+  for (let i = 0; i < 120; i++) {
+    await sleep(300)
+    const { room: r } = await api(`/api/rooms/${encodeURIComponent(diag.id)}`)
+    if (['done', 'needs_human', 'error', 'stopped'].includes(r.status)) {
+      d = r
+      break
+    }
+  }
+  assert.equal(d?.status, 'done', `diagnose room: ${d?.status} ${d?.reason}`)
+  const diagDecision = await fs.readFile(path.join(env.COLLAB_ARCHIVE, diag.id, 'DECISION.md'), 'utf8')
+  assert.match(diagDecision, /任务类型：diagnose/)
+  const diagVerify = await fs.readFile(path.join(env.COLLAB_ARCHIVE, diag.id, 'round-2', 'verify-verifier.md'), 'utf8')
+  assert.match(diagVerify, /\[CONFIRMED\]/)
+
   const list = await api('/api/rooms')
   assert.ok(list.rooms.some((r) => r.id === room.id))
   assert.ok(list.rooms.some((r) => r.id === room2.id))
+  assert.ok(list.rooms.some((r) => r.id === diag.id && r.mode === 'diagnose'))
 
   console.log('PASS 需求归档流程')
   console.log(`  房间：${room.id}`)

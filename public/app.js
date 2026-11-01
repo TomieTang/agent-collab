@@ -14,6 +14,7 @@ const store = {
 let current = null
 let source = null
 let roles = null
+let modes = null
 let pollTimer = null
 
 async function api(path, opts = {}) {
@@ -53,8 +54,11 @@ function showApp() {
   $('#login').classList.add('hidden')
   $('#app').classList.remove('hidden')
   loadTabs()
+  api('/api/modes').then((d) => {
+    modes = d.modes
+    refreshRooms()
+  }).catch(() => {})
   refreshHealth()
-  refreshRooms()
   if (store.active && store.tabs.includes(store.active)) openRoom(store.active)
   pollTimer = setInterval(poll, 3000)
 }
@@ -81,10 +85,11 @@ function renderSidebar() {
   list.textContent = ''
   for (const r of store.rooms) {
     const item = el('div', 'room-item' + (store.active === r.id ? ' active' : ''))
-    item.append(el('div', 'req', r.requirement))
+    item.append(el('div', 'req', r.task || r.requirement))
     const sub = el('div', 'sub')
     sub.append(el('span', `badge ${r.status}`, statusText(r.status)))
     sub.append(el('span', '', `${r.round}/${r.maxRounds} 轮`))
+    if (r.mode && r.mode !== 'build') sub.append(el('span', '', modeLabel(r.mode)))
     if (r.mock) sub.append(el('span', '', 'MOCK'))
     item.onclick = () => openRoom(r.id)
     list.append(item)
@@ -99,7 +104,7 @@ function renderTabs() {
     const room = store.rooms.find((r) => r.id === id)
     const tab = el('button', 'tab' + (store.active === id ? ' active' : ''))
     tab.append(el('span', `dot ${room?.status || 'idle'}`))
-    tab.append(el('span', 'tab-title', room ? shortTitle(room.requirement) : id))
+    tab.append(el('span', 'tab-title', room ? shortTitle(room.task || room.requirement) : id))
     const x = el('span', 'tab-x', '×')
     x.onclick = (e) => {
       e.stopPropagation()
@@ -113,6 +118,10 @@ function renderTabs() {
   add.title = '新建需求'
   add.onclick = openCreate
   bar.append(add)
+}
+
+function modeLabel(id) {
+  return modes?.find((m) => m.id === id)?.label || id
 }
 
 function shortTitle(text) {
@@ -161,7 +170,7 @@ function statusText(s) {
 
 function renderRoom() {
   const room = current
-  $('#room-title').textContent = room.requirement.split('\n')[0].slice(0, 60)
+  $('#room-title').textContent = (room.task || room.requirement).split('\n')[0].slice(0, 60)
   renderMeta()
   $('#reason').textContent = room.reason
     ? `结束原因：${room.reason}`
@@ -194,7 +203,7 @@ function renderRoom() {
 function renderMeta() {
   const room = current
   const rolesText = Object.entries(room.roles).map(([k, v]) => `${k}=${v.model}`).join(' · ')
-  $('#room-meta').textContent = `${statusText(room.status)} · ${room.round}/${room.maxRounds} 轮 · ${rolesText}`
+  $('#room-meta').textContent = `${statusText(room.status)} · ${modeLabel(room.mode || 'build')} · ${room.round}/${room.maxRounds} 轮 · ${rolesText}`
 }
 
 function renderFiles() {
@@ -316,15 +325,34 @@ async function poll() {
   }
 }
 
+
+function applyMode(id) {
+  const m = modes?.find((x) => x.id === id)
+  if (!m) return
+  $('#mode-hint').textContent = m.hint
+  $('#f-done').required = m.requireCommands
+  $('#f-done').placeholder = m.requireCommands ? 'npm test（必填）' : '可选，例如复现脚本'
+  const box = $('#role-preview')
+  box.textContent = ''
+  const labels = Object.entries(m.roles).map(([k, v]) => `${v}(${k})`).join(' → ')
+  box.append(el('div', '', `协作链路：${labels}`))
+  for (const [k, v] of Object.entries(roles || {})) box.append(el('div', '', `${m.roles[k] || v.label}: ${v.model}`))
+}
+
 async function openCreate() {
   $('#modal').classList.remove('hidden')
   $('#create-error').textContent = ''
-  if (!roles) {
-    roles = (await api('/api/roles')).roles
-    const box = $('#role-preview')
-    box.textContent = ''
-    for (const [k, v] of Object.entries(roles)) box.append(el('div', '', `${v.label}: ${v.model} → agent=${v.agent}`))
+  if (!roles) roles = (await api('/api/roles')).roles
+  if (!modes) modes = (await api('/api/modes')).modes
+  const sel = $('#f-mode')
+  sel.textContent = ''
+  for (const m of modes) {
+    const o = el('option', '', m.label)
+    o.value = m.id
+    sel.append(o)
   }
+  sel.onchange = () => applyMode(sel.value)
+  applyMode(sel.value)
 }
 
 $('#login-form').onsubmit = async (e) => {
@@ -351,7 +379,8 @@ $('#create-form').onsubmit = async (e) => {
   e.preventDefault()
   $('#create-error').textContent = ''
   const payload = {
-    requirement: $('#f-requirement').value,
+    mode: $('#f-mode').value,
+    task: $('#f-task').value,
     doneWhen: $('#f-done').value.split('\n').map((s) => s.trim()).filter(Boolean),
     maxRounds: Number($('#f-rounds').value),
   }

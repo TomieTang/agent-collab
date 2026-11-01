@@ -1,4 +1,4 @@
-# 独立评审（第 2 轮，MOCK）
+# Reviewer（第 2 轮，MOCK）
 
 ## CHECKLIST
 - 需求覆盖: OK

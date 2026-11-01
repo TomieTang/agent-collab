@@ -196,6 +196,35 @@ workspace-template/  opencode agent 定义模板
 requirements/        需求归档
 ```
 
+## Discussion 连接器（AtomGit / GitCode）
+
+本机定时轮询一个讨论（discussion），把讨论正文当任务开跑，并把协作过程实时贴回评论区；遇到 `[ASK]` 会在评论区提问并暂停，你回复后自动继续。
+
+```bash
+HUB_TOKEN=<atomgit token> \
+HUB_REPO=tangjie66/agent-collab \
+HUB_DISCUSSION=1 \
+COLLAB_PASSWORD=<你的网页密码> \
+npm run connector
+```
+
+| 变量 | 说明 |
+| --- | --- |
+| `HUB_BASE` | 默认 `https://atomgit.com`，GitCode 也可用 `https://gitcode.com` |
+| `HUB_REPO` | `owner/repo` |
+| `HUB_DISCUSSION` | 只监听指定编号；不填则扫全部（可配合 `HUB_OWNER` 只处理自己的） |
+| `HUB_TOKEN` | AtomGit/GitCode personal access token（`private-token` 头） |
+| `HUB_POLL_MS` | 轮询间隔，默认 20000 |
+| `CONNECTOR_STATE` | 状态文件，默认 `~/.config/agent-collab/connector.json` |
+
+先用 `npm run connector:dry` 干跑，只打印不会发评论。
+
+实现要点：
+
+- 机器人与你共用同一个账号，靠评论里的隐藏标记 `<!-- agent-collab -->` 区分，避免把自己的评论当成人输入
+- 状态文件记录 `roomId / 已发消息数 / 最后处理的评论 id`，重启不重复刷屏
+- 评论创建走 `POST /api/v5/repos/{owner}/{repo}/discuss/{n}/comment`，字段 `md_content`
+
 ## 关于 GitHub Pages
 
 GitHub Pages 只能托管静态文件，无法运行本服务（需要子进程 + 本地仓库写入 + opencode）。所以常见做法是：

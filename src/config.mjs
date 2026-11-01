@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import os from 'node:os'
 
 function loadEnvFile() {
   const file = '.env'
@@ -60,4 +61,16 @@ export const config = {
     pass: env.OC_PASS || env.OPENCODE_SERVER_PASSWORD || '',
   },
   roles: DEFAULT_ROLES,
+  connector: {
+    base: env.HUB_BASE || 'https://atomgit.com',
+    repo: env.HUB_REPO || 'tangjie66/agent-collab',
+    discussion: Number(env.HUB_DISCUSSION || 0) || null,
+    token: env.HUB_TOKEN || '',
+    owner: env.HUB_OWNER || '',
+    pollMs: Number(env.HUB_POLL_MS || 20000),
+    maxRounds: Number(env.HUB_MAX_ROUNDS || 2),
+    collabUrl: env.COLLAB_URL || `http://127.0.0.1:${env.COLLAB_PORT || 3000}`,
+    collabPassword: env.COLLAB_PASSWORD || '',
+    stateFile: env.CONNECTOR_STATE || path.join(os.homedir(), '.config/agent-collab/connector.json'),
+  },
 }

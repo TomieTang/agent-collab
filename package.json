@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.mjs",
     "mock": "COLLAB_MOCK=1 COLLAB_PASSWORD=collab node server.mjs",
-    "test": "node test/e2e.mjs",
+    "test": "node test/e2e.mjs && node test/connector.mjs",
     "connector": "node src/connector.mjs",
     "connector:dry": "node src/connector.mjs --dry --once"
   },

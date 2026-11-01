@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+STATE_DIR="${CONNECTOR_STATE_DIR:-$HOME/.config/agent-collab}"
+PIDFILE="$STATE_DIR/connector.pid"
+LOGFILE="$STATE_DIR/connector.log"
+
+mkdir -p "$STATE_DIR"
+cd "$ROOT"
+
+running() {
+  [[ -f "$PIDFILE" ]] || return 1
+  local pid
+  pid="$(cat "$PIDFILE" 2>/dev/null || true)"
+  [[ -n "$pid" ]] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+case "${1:-}" in
+  start)
+    if running; then echo "已在运行 (pid $(cat "$PIDFILE"))"; exit 0; fi
+    setsid nohup node src/connector.mjs "$@" >"$LOGFILE" 2>&1 < /dev/null &
+    echo $! > "$PIDFILE"
+    sleep 1
+    if running; then
+      echo "已启动 (pid $(cat "$PIDFILE"))"
+      echo "日志: $LOGFILE"
+    else
+      echo "启动失败，最后日志："
+      tail -20 "$LOGFILE" || true
+      exit 1
+    fi
+    ;;
+  stop)
+    if ! running; then echo "未运行"; rm -f "$PIDFILE"; exit 0; fi
+    pid="$(cat "$PIDFILE")"
+    echo "发送 SIGTERM (pid $pid)，等待归档…"
+    kill -TERM "$pid"
+    for _ in $(seq 1 120); do
+      kill -0 "$pid" 2>/dev/null || { rm -f "$PIDFILE"; echo "已停止并归档"; exit 0; }
+      sleep 1
+    done
+    echo "超时，强制结束"
+    kill -KILL "$pid" 2>/dev/null || true
+    rm -f "$PIDFILE"
+    exit 1
+    ;;
+  status)
+    if running; then echo "运行中 (pid $(cat "$PIDFILE"))"; else echo "未运行"; exit 1; fi
+    ;;
+  logs)
+    tail -n "${2:-80}" -f "$LOGFILE"
+    ;;
+  restart)
+    "$0" stop || true
+    "$0" start
+    ;;
+  *)
+    echo "用法: $0 {start|stop|restart|status|logs}"
+    exit 1
+    ;;
+esac

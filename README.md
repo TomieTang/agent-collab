@@ -241,3 +241,38 @@ GitHub Pages 只能托管静态文件，无法运行本服务（需要子进程 
 - 定位/分析类任务不改代码时，worktree 里可能是空的，属正常。
 - 并行房间共用 CANNBOT 网关配额，同一账号并发放太多会互相拖慢。
 - CANNBOT 的 JWT 过期后 `/provider` 只剩 `cannbot-error`，`/api/health` 会提示重新登录。
+
+## 后台轮询（discussion 触发）
+
+```bash
+# 1. 配置（写进仓库根目录 .env，已被 .gitignore 忽略）
+cat >> .env <<'EOF'
+HUB_TOKEN=你的 atomgit token
+HUB_REPO=tangjie66/agent-collab
+COLLAB_PASSWORD=你的网页密码
+EOF
+
+# 2. 起本地服务（另一个进程）
+npm start
+
+# 3. 起轮询服务
+./scripts/connectorctl start
+./scripts/connectorctl status
+./scripts/connectorctl logs
+./scripts/connectorctl stop      # 会先停房间、等归档、再提交 gitcode
+```
+
+行为：
+
+- 服务启动后，**新创建**的 discussion 会被扫描到并触发协作；启动前的旧讨论默认跳过（`HUB_INCLUDE_EXISTING=1` 可纳入）
+- 每个 discussion 一个独立房间、独立 session（服务端还会给每个房间独立 worktree），日志与归档互不交叉
+- 每条模型发言实时贴到对应讨论的评论区；遇到 `[ASK]` 会提问并暂停，你在评论区回复后自动续跑
+- 讨论结束时把 `requirements/<roomId>/` 提交到 `origin`（GitCode）的 `main`，提交信息 `archive(#N): ...`
+- `stop` 发送 SIGTERM：先对所有运行中的房间调 `/stop`，等 `REPORT.md` 落盘，再提交归档，最后退出；90 秒未收敛才强制结束
+
+| 变量 | 说明 |
+| --- | --- |
+| `HUB_INCLUDE_EXISTING` | `1` 时启动即处理已有讨论 |
+| `CONNECTOR_GIT` | `0` 关闭自动提交 |
+| `CONNECTOR_REMOTE` / `CONNECTOR_BRANCH` | 默认 `origin` / `main` |
+| `CONNECTOR_STATE` | 默认 `~/.config/agent-collab/connector.json` |

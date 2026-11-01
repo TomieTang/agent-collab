@@ -72,5 +72,9 @@ export const config = {
     collabUrl: env.COLLAB_URL || `http://127.0.0.1:${env.COLLAB_PORT || 3000}`,
     collabPassword: env.COLLAB_PASSWORD || '',
     stateFile: env.CONNECTOR_STATE || path.join(os.homedir(), '.config/agent-collab/connector.json'),
+    includeExisting: env.HUB_INCLUDE_EXISTING === '1',
+    git: env.CONNECTOR_GIT !== '0',
+    remote: env.CONNECTOR_REMOTE || 'origin',
+    branch: env.CONNECTOR_BRANCH || 'main',
   },
 }

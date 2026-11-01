@@ -88,6 +88,14 @@ export class OpencodeClient {
     }
   }
 
+  async messages(sessionID) {
+    return this.request(`/session/${sessionID}/message`)
+  }
+
+  async deleteSession(sessionID) {
+    return this.request(`/session/${sessionID}`, { method: 'DELETE' })
+  }
+
   async abort(sessionID) {
     try {
       return await this.request(`/session/${sessionID}/abort`, { method: 'POST' })

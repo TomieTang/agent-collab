@@ -183,8 +183,23 @@ try {
   const diagVerify = await fs.readFile(path.join(env.COLLAB_ARCHIVE, diag.id, 'round-2', 'verify-verifier.md'), 'utf8')
   assert.match(diagVerify, /\[CONFIRMED\]/)
 
+  const closed = await api(`/api/rooms/${encodeURIComponent(room.id)}/close`, { method: 'POST' })
+  assert.equal(closed.room.closed, true)
+  assert.equal(closed.errors.length, 0)
+  for (const key of ['architect', 'reviewer', 'verifier']) {
+    const dump = JSON.parse(await fs.readFile(path.join(dir, 'sessions', `${key}.json`), 'utf8'))
+    assert.equal(dump.role, key)
+    assert.ok(Array.isArray(dump.messages) && dump.messages.length > 0)
+  }
+  const reportAfter = await fs.readFile(path.join(dir, 'REPORT.md'), 'utf8')
+  assert.match(reportAfter, /会话关闭/)
+  const blocked = await fetch(BASE + `/api/rooms/${encodeURIComponent(room.id)}/start`, { method: 'POST', headers: { cookie } })
+  assert.equal(blocked.status, 400)
+  const decideStill = await fs.stat(path.join(dir, 'DECISION.md'))
+  assert.ok(decideStill, 'closing must not remove archive')
+
   const list = await api('/api/rooms')
-  assert.ok(list.rooms.some((r) => r.id === room.id))
+  assert.ok(list.rooms.some((r) => r.id === room.id && r.closed === true))
   assert.ok(list.rooms.some((r) => r.id === room2.id))
   assert.ok(list.rooms.some((r) => r.id === diag.id && r.mode === 'diagnose'))
 

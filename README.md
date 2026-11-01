@@ -134,6 +134,21 @@ REPORT.md              结果、分工、变更文件、证据
 
 只要还有 `UNVERIFIABLE` 或缺少 `[CONFIRMED]`，这轮就不算通过。
 
+## 关闭会话
+
+会话（opencode 上下文）与归档是两回事：**关闭只删 opencode 里的上下文，`requirements/<id>/` 不会动**。
+
+点击「关闭会话」时按顺序执行：
+
+1. 校验房间处于终态（`done` / `needs_human` / `stopped` / `error`），运行中拒绝
+2. 用 `GET /session/:id/message` 把每个角色的原始会话导出到 `sessions/<role>.json`（含 tool 调用等原始内容，不只是文本）
+3. `DELETE /session/:id` 删除三个会话
+4. `room.json` 记 `closed: true`、`closedAt`、`closeErrors`，并在 `REPORT.md` 追加「会话关闭」段
+
+关闭后该房间不能再 `start`（会 400），要接着做就新建任务或 `fork` 旧会话。
+
+建议时机：`done` 后观察几天再关；`needs_human` 不要关，那是在等你决策；`error` 处理完再关。一个 session 只服务一个任务，不要复用。
+
 ## 角色分工依据
 
 - Reviewer 用只读 agent（`tools.write/edit/bash=false`），从机制上避免它一边评审一边改代码。

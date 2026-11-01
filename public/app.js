@@ -90,6 +90,7 @@ function renderSidebar() {
     sub.append(el('span', `badge ${r.status}`, statusText(r.status)))
     sub.append(el('span', '', `${r.round}/${r.maxRounds} 轮`))
     if (r.mode && r.mode !== 'build') sub.append(el('span', '', modeLabel(r.mode)))
+    if (r.closed) sub.append(el('span', 'badge closed', '已关闭'))
     if (r.mock) sub.append(el('span', '', 'MOCK'))
     item.onclick = () => openRoom(r.id)
     list.append(item)
@@ -172,6 +173,7 @@ function renderRoom() {
   const room = current
   $('#room-title').textContent = (room.task || room.requirement).split('\n')[0].slice(0, 60)
   renderMeta()
+  renderControls()
   $('#reason').textContent = room.reason
     ? `结束原因：${room.reason}`
     : room.isolated
@@ -200,10 +202,22 @@ function renderRoom() {
   loadBoard()
 }
 
+function renderControls() {
+  const terminal = ['done', 'needs_human', 'stopped', 'error', 'interrupted'].includes(current.status)
+  const running = ['running', 'queued', 'paused'].includes(current.status)
+  const closed = Boolean(current.closed)
+  $('#btn-start').disabled = closed || running
+  $('#btn-start').textContent = closed ? '已关闭' : '开始'
+  $('#btn-pause').disabled = closed || !running
+  $('#btn-stop').disabled = closed || !running
+  $('#btn-close').classList.toggle('hidden', !terminal || closed)
+}
+
 function renderMeta() {
   const room = current
   const rolesText = Object.entries(room.roles).map(([k, v]) => `${k}=${v.model}`).join(' · ')
-  $('#room-meta').textContent = `${statusText(room.status)} · ${modeLabel(room.mode || 'build')} · ${room.round}/${room.maxRounds} 轮 · ${rolesText}`
+  const closed = room.closed ? ' · 已关闭会话' : ''
+  $('#room-meta').textContent = `${statusText(room.status)}${closed} · ${modeLabel(room.mode || 'build')} · ${room.round}/${room.maxRounds} 轮 · ${rolesText}`
 }
 
 function renderFiles() {
@@ -266,6 +280,7 @@ function handleEvent(ev) {
   if (ev.type === 'status') {
     current.status = ev.status
     renderMeta()
+    renderControls()
     refreshRooms()
   }
   if (ev.type === 'round_start') {
@@ -278,6 +293,14 @@ function handleEvent(ev) {
     $('#reason').textContent = bits.join(' · ')
   }
   if (ev.type === 'error') $('#reason').textContent = `错误：${ev.message}`
+  if (ev.type === 'closed') {
+    current.closed = true
+    current.closedAt = ev.closedAt
+    renderMeta()
+    renderControls()
+    refreshArtifacts()
+    refreshRooms()
+  }
   if (ev.type === 'done') {
     current.status = ev.status
     current.reason = ev.reason
@@ -294,8 +317,10 @@ async function refreshArtifacts() {
   current.status = room.status
   current.round = room.round
   current.reason = room.reason
+  current.closed = room.closed
   renderFiles()
   renderMeta()
+  renderControls()
 }
 
 async function viewFile(path) {
@@ -404,6 +429,22 @@ $('#btn-start').onclick = async () => {
 }
 $('#btn-pause').onclick = () => api(`/api/rooms/${encodeURIComponent(current.id)}/pause`, { method: 'POST' }).then(refreshRooms)
 $('#btn-stop').onclick = () => api(`/api/rooms/${encodeURIComponent(current.id)}/stop`, { method: 'POST' }).then(refreshRooms)
+
+$('#btn-close').onclick = async () => {
+  if (!confirm('关闭会删除 opencode 中的会话上下文，归档保留。继续？')) return
+  try {
+    const { room, errors } = await api(`/api/rooms/${encodeURIComponent(current.id)}/close`, { method: 'POST' })
+    current.closed = true
+    current.closedAt = room.closedAt
+    renderMeta()
+    renderControls()
+    refreshArtifacts()
+    refreshRooms()
+    if (errors?.length) $('#reason').textContent = `会话已关闭，但有异常：${errors.join('；')}`
+  } catch (err) {
+    $('#reason').textContent = `关闭失败：${err.message}`
+  }
+}
 
 $('#inject-send').onclick = async () => {
   const text = $('#inject-text').value.trim()

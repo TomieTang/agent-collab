@@ -142,3 +142,5 @@ main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .dot.queued, .dot.needs_human, .dot.stopped, .dot.interrupted { background: var(--warn); }
 .dot.error { background: var(--danger); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+.badge.closed { color: var(--muted); opacity: .8; }

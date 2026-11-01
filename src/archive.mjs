@@ -69,6 +69,7 @@ export class Archive {
           round: room.round,
           maxRounds: room.maxRounds,
           mock: room.mock,
+          closed: Boolean(room.closed),
           createdAt: room.createdAt,
           updatedAt: room.updatedAt,
           roles: Object.fromEntries(Object.entries(room.roles || {}).map(([k, v]) => [k, v.model])),
@@ -150,6 +151,10 @@ ${proposal}
 ${unresolved.length ? unresolved.map((u) => `- ${u}`).join('\n') : '- 无'}
 `
     await this.writeArtifact(room, 'DECISION.md', content)
+  }
+
+  async appendReport(room, text) {
+    await fs.appendFile(path.join(this.roomDir(room.id), 'REPORT.md'), text, 'utf8')
   }
 
   async writeReport(room, extra) {

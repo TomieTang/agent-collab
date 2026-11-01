@@ -75,6 +75,22 @@ created ──start──▶ queued ──▶ running ──┬──▶ done   
 服务重启时 running → interrupted（不自动续跑，避免半轮状态污染）
 ```
 
+## 会话生命周期
+
+```
+创建房间 → 3 个 session 建立
+  ↓
+queued → running ⇄ paused → done / needs_human / stopped / error
+  ↓
+关闭会话（仅终态可用）
+  1. 导出原始会话 → requirements/<id>/sessions/<role>.json
+  2. DELETE /session/:id × 3
+  3. room.json: closed=true, closedAt, closeErrors
+  4. REPORT.md 追加「会话关闭」
+```
+
+归档（`requirements/`）与 opencode 上下文相互独立：先导出再删除，因此关闭是可逆性最差但信息无损的操作。导出失败不阻塞删除，异常记入 `closeErrors` 并在 REPORT 里可见。
+
 ## 安全边界
 
 - 服务默认绑定 `127.0.0.1`，对外只经 Cloudflare Tunnel；opencode 端口不暴露。

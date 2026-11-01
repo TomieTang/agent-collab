@@ -241,7 +241,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { room })
     }
 
-    const m = p.match(/^\/api\/rooms\/([^/]+)(?:\/(start|pause|stop|inject|events|file))?$/)
+    const m = p.match(/^\/api\/rooms\/([^/]+)(?:\/(start|pause|stop|inject|events|file|close))?$/)
     if (m) {
       const room = await ensureRoom(decodeURIComponent(m[1]))
       const action = m[2]
@@ -266,8 +266,49 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (action === 'start') {
+        if (room.closed) return json(res, 400, { error: '会话已关闭，请新建任务' })
         const started = startRoom(room)
         return json(res, 200, { started })
+      }
+
+      if (action === 'close') {
+        const terminal = ['done', 'needs_human', 'stopped', 'error', 'interrupted']
+        if (!terminal.includes(room.status)) return json(res, 400, { error: '任务还在运行，请先停止' })
+        if (room.closed) return json(res, 200, { room, skipped: true })
+        const errors = []
+        for (const [key, role] of Object.entries(room.roles)) {
+          try {
+            const messages = await oc.messages(role.sessionID)
+            await archive.writeArtifact(
+              room,
+              `sessions/${key}.json`,
+              JSON.stringify({ role: key, label: role.label, model: role.model, sessionID: role.sessionID, exportedAt: new Date().toISOString(), messages }, null, 2)
+            )
+          } catch (e) {
+            errors.push(`${key} 导出失败：${e.message}`)
+          }
+          try {
+            await oc.deleteSession(role.sessionID)
+          } catch (e) {
+            errors.push(`${key} 删除失败：${e.message}`)
+          }
+        }
+        room.closed = true
+        room.closedAt = new Date().toISOString()
+        room.closeErrors = errors
+        await archive.saveRoom(room)
+        await archive.appendReport(
+          room,
+          `
+## 会话关闭
+
+- 时间：${room.closedAt}
+- 原始会话已导出到 \`sessions/\`，之后 opencode 中的上下文已删除
+${errors.length ? `- 异常：\n${errors.map((e) => `  - ${e}`).join('\n')}` : '- 无异常'}
+`
+        )
+        emit(room, { type: 'closed', closedAt: room.closedAt, errors })
+        return json(res, 200, { room, errors })
       }
 
       if (action === 'pause') {

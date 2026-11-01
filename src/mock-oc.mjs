@@ -30,6 +30,19 @@ export class MockOpencodeClient {
     return true
   }
 
+  async messages(sessionID) {
+    return [
+      {
+        info: { id: `mock-msg-${sessionID}-1`, role: 'assistant', sessionID },
+        parts: [{ type: 'text', text: 'MOCK 会话原始记录' }],
+      },
+    ]
+  }
+
+  async deleteSession() {
+    return true
+  }
+
   async ask(sessionID, { agent, text }) {
     await delay(120)
     const round = Number((text.match(/轮次：(\d+)/) || [])[1] || 1)
